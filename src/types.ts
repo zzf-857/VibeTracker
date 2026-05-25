@@ -85,6 +85,7 @@ export interface IpcRenderer {
   invoke(channel: 'delete-status', id: string): Promise<{ ok: boolean; reason?: string }>
   invoke(channel: 'reorder-statuses', orderedIds: string[]): Promise<boolean>
   invoke(channel: 'select-image'): Promise<string | null>
+  invoke(channel: 'read-image-data-url', imagePath: string): Promise<string | null>
 
   invoke(channel: 'get-commits', projectId: string): Promise<ProjectCommit[]>
   invoke(channel: 'create-commit', data: { projectId: string; title: string; description?: string; progressDelta?: number; imagePath?: string }): Promise<string>

@@ -1,5 +1,16 @@
 import { dialog, ipcMain } from 'electron'
 import db from './database'
+import fs from 'node:fs/promises'
+import path from 'node:path'
+
+const imageMimeTypes: Record<string, string> = {
+  '.png': 'image/png',
+  '.jpg': 'image/jpeg',
+  '.jpeg': 'image/jpeg',
+  '.webp': 'image/webp',
+  '.gif': 'image/gif',
+  '.bmp': 'image/bmp',
+}
 
 function hydrateCommit(commit: any) {
   commit.images = db.prepare('SELECT * FROM commit_images WHERE commitId = ? ORDER BY sortIndex ASC, createdAt ASC').all(commit.id)
@@ -172,6 +183,19 @@ export function setupIpcHandlers() {
       ]
     })
     return result.canceled ? null : result.filePaths[0]
+  })
+
+  ipcMain.handle('read-image-data-url', async (_, imagePath: string) => {
+    if (!imagePath || /^(data|https?):/i.test(imagePath)) return imagePath || null
+    const ext = path.extname(imagePath).toLowerCase()
+    const mime = imageMimeTypes[ext]
+    if (!mime) return null
+    try {
+      const data = await fs.readFile(imagePath)
+      return `data:${mime};base64,${data.toString('base64')}`
+    } catch {
+      return null
+    }
   })
 
   // --- Project Commits ---
