@@ -78,6 +78,17 @@ body {
   transition-timing-function: ease-out;
 }
 
+@keyframes softReveal {
+  from {
+    opacity: 0;
+    transform: translateY(-6px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
 /* Custom Scrollbar for global scrollable areas */
 ::-webkit-scrollbar {
   width: 6px;

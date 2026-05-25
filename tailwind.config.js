@@ -11,6 +11,12 @@ module.exports = {
         secondary: "var(--bg-secondary)",
         tertiary: "var(--bg-tertiary)",
         sidebar: "var(--bg-sidebar)",
+        bg: {
+          primary: "var(--bg-primary)",
+          secondary: "var(--bg-secondary)",
+          tertiary: "var(--bg-tertiary)",
+          sidebar: "var(--bg-sidebar)",
+        },
         border: {
           primary: "var(--border-primary)",
           subtle: "var(--border-subtle)",

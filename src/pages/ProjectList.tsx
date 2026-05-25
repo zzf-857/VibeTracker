@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react'
 import { Project, ProjectStatus, Tag } from '../types'
-import { Search, Plus, Image, Sparkles, Folder } from 'lucide-react'
+import { Search, Plus, Image, Sparkles, Folder, X } from 'lucide-react'
 import { useNavigate } from 'react-router-dom'
 import { SafeImage } from '../components/SafeImage'
 import { formatDateTime, getProjectCover, getRecentCommit } from '../lib/projectView'
@@ -15,6 +15,7 @@ export function ProjectList() {
   const [newProjectDescription, setNewProjectDescription] = useState('')
   const [newProjectPath, setNewProjectPath] = useState('')
   const [newProjectStatus, setNewProjectStatus] = useState('')
+  const [isComposerOpen, setIsComposerOpen] = useState(false)
   const navigate = useNavigate()
 
   useEffect(() => {
@@ -55,7 +56,15 @@ export function ProjectList() {
     setNewProjectName('')
     setNewProjectDescription('')
     setNewProjectPath('')
+    setIsComposerOpen(false)
     navigate(`/project/${id}`)
+  }
+
+  const closeComposer = () => {
+    setIsComposerOpen(false)
+    setNewProjectName('')
+    setNewProjectDescription('')
+    setNewProjectPath('')
   }
 
   return (
@@ -66,47 +75,69 @@ export function ProjectList() {
           <h1 className="text-[34px] font-semibold tracking-normal">项目画廊</h1>
           <p className="text-text-secondary text-sm mt-2">用封面和最近提交扫一眼每个 vibecoding 项目的状态。</p>
         </div>
-        <div className="glass-panel rounded-[28px] p-4 w-[520px]">
-          <div className="flex items-center gap-2 mb-3 text-sm font-semibold">
-            <Sparkles size={16} className="text-accent-blue" />
-            新建项目
-          </div>
-          <div className="flex flex-col gap-2">
-            <input
-              value={newProjectName}
-              onChange={e => setNewProjectName(e.target.value)}
-              className="bg-bg-tertiary border border-border-subtle rounded-2xl px-4 py-2.5 text-sm outline-none focus:border-border-primary"
-              placeholder="项目名称"
-            />
-            <div className="grid grid-cols-[1fr_150px] gap-2">
+        <button
+          onClick={() => setIsComposerOpen(true)}
+          className={`h-12 px-5 rounded-full border text-sm font-semibold flex items-center gap-2 transition-all duration-[180ms] ${isComposerOpen ? 'bg-text-primary text-primary border-transparent' : 'bg-white/[0.08] border-border-primary text-text-primary hover:bg-white/[0.12]'}`}
+        >
+          <Plus size={16} />
+          新建项目
+        </button>
+      </div>
+
+      {isComposerOpen && (
+        <section className="glass-panel rounded-[30px] p-4 animate-[softReveal_220ms_ease-out]">
+          <div className="grid grid-cols-[minmax(220px,1.15fr)_minmax(180px,0.9fr)_170px_auto] gap-3 items-center">
+            <div className="relative">
+              <Sparkles size={15} className="absolute left-4 top-1/2 -translate-y-1/2 text-accent-blue" />
               <input
-                value={newProjectDescription}
-                onChange={e => setNewProjectDescription(e.target.value)}
-                className="bg-bg-tertiary border border-border-subtle rounded-2xl px-4 py-2.5 text-sm outline-none focus:border-border-primary"
-                placeholder="一句话介绍这个项目"
+                autoFocus
+                value={newProjectName}
+                onChange={e => setNewProjectName(e.target.value)}
+                className="w-full h-12 bg-bg-tertiary border border-border-subtle rounded-full pl-11 pr-4 text-sm text-text-primary placeholder:text-text-tertiary outline-none focus:border-border-primary"
+                placeholder="项目名称"
               />
-              <select
-                value={newProjectStatus}
-                onChange={e => setNewProjectStatus(e.target.value)}
-                className="bg-bg-tertiary border border-border-subtle rounded-2xl px-3 py-2.5 text-sm outline-none focus:border-border-primary"
-              >
-                {statuses.map(status => <option key={status.id} value={status.id}>{status.name}</option>)}
-              </select>
             </div>
-            <div className="grid grid-cols-[1fr_auto] gap-2">
-              <input
-                value={newProjectPath}
-                onChange={e => setNewProjectPath(e.target.value)}
-                className="bg-bg-tertiary border border-border-subtle rounded-2xl px-4 py-2.5 text-sm outline-none focus:border-border-primary font-mono"
-                placeholder="本地路径，可选"
-              />
-              <button onClick={createProject} disabled={!newProjectName.trim()} className="bg-text-primary text-primary rounded-full px-4 text-sm font-semibold flex items-center gap-2 transition-all duration-[180ms] hover:opacity-90 disabled:opacity-40">
+            <input
+              value={newProjectDescription}
+              onChange={e => setNewProjectDescription(e.target.value)}
+              className="h-12 bg-bg-tertiary border border-border-subtle rounded-full px-4 text-sm text-text-primary placeholder:text-text-tertiary outline-none focus:border-border-primary"
+              placeholder="一句话介绍"
+            />
+            <select
+              value={newProjectStatus}
+              onChange={e => setNewProjectStatus(e.target.value)}
+              className="h-12 bg-bg-tertiary border border-border-subtle rounded-full px-4 text-sm text-text-primary outline-none focus:border-border-primary"
+            >
+              {statuses.map(status => <option key={status.id} value={status.id}>{status.name}</option>)}
+            </select>
+            <div className="flex items-center justify-end gap-2">
+              <button
+                onClick={createProject}
+                disabled={!newProjectName.trim()}
+                className="h-12 px-5 rounded-full bg-text-primary text-primary text-sm font-semibold flex items-center gap-2 transition-opacity hover:opacity-90 disabled:opacity-35"
+              >
                 <Plus size={15} /> 创建
+              </button>
+              <button
+                onClick={closeComposer}
+                className="h-12 w-12 rounded-full bg-bg-tertiary border border-border-subtle text-text-tertiary hover:text-text-primary transition-colors grid place-items-center"
+                title="关闭"
+              >
+                <X size={16} />
               </button>
             </div>
           </div>
-        </div>
-      </div>
+          <div className="mt-3 relative">
+            <Folder size={14} className="absolute left-4 top-1/2 -translate-y-1/2 text-text-tertiary" />
+            <input
+              value={newProjectPath}
+              onChange={e => setNewProjectPath(e.target.value)}
+              className="w-full h-11 bg-bg-secondary border border-border-subtle rounded-full pl-10 pr-4 text-xs text-text-secondary placeholder:text-text-tertiary outline-none focus:border-border-primary font-mono"
+              placeholder="本地路径，可选，例如 C:\\Projects\\VibeTracker"
+            />
+          </div>
+        </section>
+      )}
 
       <div className="glass-panel rounded-[28px] p-3 flex items-center justify-between gap-4">
         <div className="flex items-center gap-2 overflow-x-auto px-1">
