@@ -5,6 +5,7 @@
   "main": "dist-electron/main.js",
   "scripts": {
     "dev": "vite",
+    "seed:demo": "python scripts/seed-demo-data.py",
     "test:unit": "node --test tests/*.test.ts",
     "build": "tsc -p tsconfig.json && tsc -p tsconfig.node.json && vite build && npm run build:electron",
     "build:electron": "tsc -p electron/tsconfig.json",
