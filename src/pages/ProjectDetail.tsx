@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
-import { Project, ProjectCommit, ProjectStatus } from '../types'
-import { ArrowLeft, Camera, Folder, ImagePlus, Pencil, Plus, RotateCcw, Save, Trash2, X } from 'lucide-react'
+import { CommitImage, Project, ProjectCommit, ProjectStatus } from '../types'
+import { ArrowLeft, Camera, Folder, ImageOff, ImagePlus, Pencil, Plus, RotateCcw, Save, Star, Trash2, X } from 'lucide-react'
 import { formatDateTime, getActivityLevel, getProjectCover, groupCommitsByDay, toImageSrc } from '../lib/projectView'
 
 export function ProjectDetail() {
@@ -173,7 +173,7 @@ export function ProjectDetail() {
         <div className="glass-panel rounded-[32px] overflow-hidden min-h-[260px]">
           {cover ? (
             <div className="relative h-full min-h-[260px] group">
-              <img src={toImageSrc(cover)} className="w-full h-full object-cover" />
+              <SafeImage src={cover} alt={`${project.name} 封面`} className="w-full h-full object-cover" />
               <div className="absolute inset-x-0 bottom-0 p-4 bg-gradient-to-t from-black/65 to-transparent flex items-center gap-2">
                 <button onClick={selectManualCover} className="px-3 py-1.5 rounded-full bg-white/12 border border-white/15 text-xs text-white/85 hover:text-white backdrop-blur-md flex items-center gap-1.5">
                   <ImagePlus size={13} /> 更换封面
@@ -253,7 +253,7 @@ export function ProjectDetail() {
             <div className="grid grid-cols-2 gap-3">
               {commits.flatMap(c => c.images || []).slice(0, 4).map(image => (
                 <button key={image.id} onClick={() => setCoverFromPath(image.imagePath)} className="aspect-video rounded-2xl overflow-hidden bg-bg-tertiary border border-border-subtle">
-                  <img src={toImageSrc(image.imagePath)} className="w-full h-full object-cover" />
+                  <SafeImage src={image.imagePath} alt={image.caption || '提交截图'} className="w-full h-full object-cover" />
                 </button>
               ))}
             </div>
@@ -265,11 +265,13 @@ export function ProjectDetail() {
       {editingCommit && (
         <CommitEditor
           commit={editingCommit}
+          onSetCover={(imagePath) => setCoverFromPath(imagePath)}
           onClose={() => setEditingCommit(null)}
           onSaved={() => {
             setEditingCommit(null)
             loadData()
           }}
+          onChanged={loadData}
         />
       )}
     </div>
@@ -297,7 +299,7 @@ function CommitCard({ commit, onEdit, onDelete, onSetCover }: { commit: ProjectC
         <div className="grid grid-cols-3 gap-3 mt-4">
           {commit.images?.map(image => (
             <button key={image.id} onClick={() => onSetCover(image.imagePath)} className="aspect-video rounded-2xl overflow-hidden bg-bg-tertiary border border-border-subtle group">
-              <img src={toImageSrc(image.imagePath)} className="w-full h-full object-cover transition-transform duration-300 group-hover:scale-[1.03]" />
+              <SafeImage src={image.imagePath} alt={image.caption || commit.title} className="w-full h-full object-cover transition-transform duration-300 group-hover:scale-[1.03]" />
             </button>
           ))}
         </div>
@@ -306,15 +308,30 @@ function CommitCard({ commit, onEdit, onDelete, onSetCover }: { commit: ProjectC
   )
 }
 
-function CommitEditor({ commit, onClose, onSaved }: { commit: ProjectCommit; onClose: () => void; onSaved: () => void }) {
+function CommitEditor({
+  commit,
+  onClose,
+  onSaved,
+  onChanged,
+  onSetCover,
+}: {
+  commit: ProjectCommit
+  onClose: () => void
+  onSaved: () => void
+  onChanged: () => void
+  onSetCover: (imagePath: string) => void
+}) {
   const [title, setTitle] = useState(commit.title)
   const [description, setDescription] = useState(commit.description)
   const [progressDelta, setProgressDelta] = useState(String(commit.progressDelta || ''))
+  const [images, setImages] = useState<CommitImage[]>(commit.images || [])
+  const [caption, setCaption] = useState('')
 
   const save = async () => {
+    if (!title.trim()) return
     await window.ipcRenderer.invoke('update-commit', commit.id, {
-      title,
-      description,
+      title: title.trim(),
+      description: description.trim(),
       progressDelta: Number(progressDelta) || 0,
     })
     onSaved()
@@ -323,14 +340,23 @@ function CommitEditor({ commit, onClose, onSaved }: { commit: ProjectCommit; onC
   const addImage = async () => {
     const path = await window.ipcRenderer.invoke('select-image')
     if (path) {
-      await window.ipcRenderer.invoke('add-commit-image', commit.id, path)
-      onSaved()
+      const id = await window.ipcRenderer.invoke('add-commit-image', commit.id, path, caption.trim())
+      setImages(prev => [...prev, { id, commitId: commit.id, imagePath: path, caption: caption.trim(), sortIndex: prev.length, createdAt: Date.now() }])
+      setCaption('')
+      onChanged()
     }
+  }
+
+  const deleteImage = async (imageId: string) => {
+    if (!confirm('从这条提交中移除这张截图？')) return
+    await window.ipcRenderer.invoke('delete-commit-image', imageId)
+    setImages(prev => prev.filter(image => image.id !== imageId))
+    onChanged()
   }
 
   return (
     <div className="fixed inset-0 z-50 bg-black/40 backdrop-blur-sm flex justify-end">
-      <aside className="w-[460px] h-full bg-[#111318] border-l border-border-primary p-6 shadow-2xl">
+      <aside className="w-[500px] h-full bg-[#111318] border-l border-border-primary p-6 shadow-2xl overflow-y-auto custom-scrollbar">
         <div className="flex items-center justify-between mb-6">
           <h2 className="text-xl font-semibold">编辑提交</h2>
           <button onClick={onClose} className="text-text-tertiary hover:text-text-primary"><X size={18} /></button>
@@ -339,14 +365,66 @@ function CommitEditor({ commit, onClose, onSaved }: { commit: ProjectCommit; onC
           <input value={title} onChange={e => setTitle(e.target.value)} className="w-full bg-bg-secondary border border-border-subtle rounded-2xl px-4 py-3 text-sm outline-none" />
           <textarea value={description} onChange={e => setDescription(e.target.value)} className="w-full bg-bg-secondary border border-border-subtle rounded-2xl px-4 py-3 text-sm outline-none h-40 resize-none" />
           <input value={progressDelta} onChange={e => setProgressDelta(e.target.value)} className="w-full bg-bg-secondary border border-border-subtle rounded-2xl px-4 py-3 text-sm outline-none font-mono" placeholder="进度变化" />
-          <button onClick={addImage} className="w-full bg-bg-secondary border border-border-subtle rounded-full px-4 py-3 text-sm text-text-secondary hover:text-text-primary flex items-center justify-center gap-2">
-            <ImagePlus size={15} /> 添加截图路径
-          </button>
-          <button onClick={save} className="w-full bg-text-primary text-primary rounded-full px-4 py-3 text-sm font-semibold">保存修改</button>
+          <div className="bg-bg-secondary border border-border-subtle rounded-[24px] p-4">
+            <div className="flex items-center justify-between gap-3 mb-3">
+              <div>
+                <h3 className="text-sm font-semibold">提交截图</h3>
+                <p className="text-xs text-text-tertiary mt-1">图片只保存本地路径，点击星标可设为项目封面。</p>
+              </div>
+              <span className="text-xs text-text-tertiary font-mono">{images.length}</span>
+            </div>
+            <input
+              value={caption}
+              onChange={e => setCaption(e.target.value)}
+              className="w-full bg-bg-tertiary border border-border-subtle rounded-full px-4 py-2.5 text-xs outline-none mb-3"
+              placeholder="新截图说明，可选"
+            />
+            <button onClick={addImage} className="w-full bg-bg-tertiary border border-border-subtle rounded-full px-4 py-3 text-sm text-text-secondary hover:text-text-primary flex items-center justify-center gap-2">
+              <ImagePlus size={15} /> 添加截图路径
+            </button>
+            <div className="space-y-3 mt-4">
+              {images.map(image => (
+                <div key={image.id} className="grid grid-cols-[112px_1fr_auto] gap-3 items-center">
+                  <div className="aspect-video rounded-2xl overflow-hidden bg-bg-tertiary border border-border-subtle">
+                    <SafeImage src={image.imagePath} alt={image.caption || title} className="w-full h-full object-cover" />
+                  </div>
+                  <div className="min-w-0">
+                    <p className="text-sm text-text-secondary truncate">{image.caption || '未命名截图'}</p>
+                    <p className="text-[11px] text-text-tertiary font-mono truncate mt-1">{image.imagePath}</p>
+                  </div>
+                  <div className="flex items-center gap-1">
+                    <button onClick={() => onSetCover(image.imagePath)} className="p-2 rounded-full text-text-tertiary hover:text-text-primary hover:bg-bg-tertiary" title="设为封面">
+                      <Star size={14} />
+                    </button>
+                    <button onClick={() => deleteImage(image.id)} className="p-2 rounded-full text-text-tertiary hover:text-accent-red hover:bg-bg-tertiary" title="删除截图">
+                      <Trash2 size={14} />
+                    </button>
+                  </div>
+                </div>
+              ))}
+              {images.length === 0 && <p className="py-5 text-center text-sm text-text-tertiary">这条提交还没有截图。</p>}
+            </div>
+          </div>
+          <button onClick={save} disabled={!title.trim()} className="w-full bg-text-primary text-primary rounded-full px-4 py-3 text-sm font-semibold disabled:opacity-40">保存修改</button>
         </div>
       </aside>
     </div>
   )
+}
+
+function SafeImage({ src, alt, className }: { src: string; alt: string; className?: string }) {
+  const [failed, setFailed] = useState(false)
+  if (failed || !src) {
+    return (
+      <div className="w-full h-full grid place-items-center bg-bg-tertiary text-text-tertiary">
+        <div className="flex flex-col items-center gap-2 text-[11px]">
+          <ImageOff size={18} />
+          图片不可用
+        </div>
+      </div>
+    )
+  }
+  return <img src={toImageSrc(src)} alt={alt} className={className} onError={() => setFailed(true)} />
 }
 
 function CommitHeatmap({ commits }: { commits: ProjectCommit[] }) {
