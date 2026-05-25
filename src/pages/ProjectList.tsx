@@ -4,6 +4,7 @@ import { Search, Plus, Image, Sparkles, Folder, X } from 'lucide-react'
 import { useNavigate } from 'react-router-dom'
 import { SafeImage } from '../components/SafeImage'
 import { formatDateTime, getProjectCover, getRecentCommit } from '../lib/projectView'
+import { MOCK_MODE_LABEL, mockProjects, mockStatuses, mockTags } from '../lib/mockData'
 
 export function ProjectList() {
   const [projects, setProjects] = useState<Project[]>([])
@@ -35,7 +36,8 @@ export function ProjectList() {
   }
 
   const filteredProjects = useMemo(() => {
-    return projects.filter(p => {
+    const displayProjects = projects.length === 0 ? mockProjects : projects
+    return displayProjects.filter(p => {
       const matchSearch = p.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
         (p.description || '').toLowerCase().includes(searchQuery.toLowerCase()) ||
         (p.path || '').toLowerCase().includes(searchQuery.toLowerCase())
@@ -43,6 +45,9 @@ export function ProjectList() {
       return matchSearch && matchTag
     })
   }, [projects, searchQuery, activeTag])
+
+  const isMockMode = projects.length === 0
+  const displayTags = isMockMode ? mockTags : tags
 
   const createProject = async () => {
     if (!newProjectName.trim()) return
@@ -72,7 +77,10 @@ export function ProjectList() {
       <div className="flex items-end justify-between gap-8">
         <div>
           <p className="text-text-tertiary text-sm mb-2">Project Gallery</p>
-          <h1 className="text-[34px] font-semibold tracking-normal">项目画廊</h1>
+          <div className="flex items-center gap-3">
+            <h1 className="text-[34px] font-semibold tracking-normal">项目画廊</h1>
+            {isMockMode && <span className="px-3 py-1 rounded-full bg-white/[0.08] border border-border-subtle text-xs text-text-secondary">{MOCK_MODE_LABEL}</span>}
+          </div>
           <p className="text-text-secondary text-sm mt-2">用封面和最近提交扫一眼每个 vibecoding 项目的状态。</p>
         </div>
         <button
@@ -108,7 +116,7 @@ export function ProjectList() {
               onChange={e => setNewProjectStatus(e.target.value)}
               className="h-12 bg-bg-tertiary border border-border-subtle rounded-full px-4 text-sm text-text-primary outline-none focus:border-border-primary"
             >
-              {statuses.map(status => <option key={status.id} value={status.id}>{status.name}</option>)}
+              {(statuses.length ? statuses : mockStatuses).map(status => <option key={status.id} value={status.id}>{status.name}</option>)}
             </select>
             <div className="flex items-center justify-end gap-2">
               <button
@@ -147,7 +155,7 @@ export function ProjectList() {
           >
             全部项目
           </button>
-          {tags.map(tag => (
+          {displayTags.map(tag => (
             <button
               key={tag.id}
               onClick={() => setActiveTag(tag.id)}

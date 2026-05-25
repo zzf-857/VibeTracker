@@ -43,7 +43,7 @@ export function formatDateKey(timestamp: number) {
 
 export function toImageSrc(imagePath: string) {
   if (!imagePath) return ''
-  if (/^(file|https?):\/\//i.test(imagePath)) return imagePath
+  if (/^(file|https?|data):/i.test(imagePath)) return imagePath
   return `file:///${imagePath.replace(/\\/g, '/')}`
 }
 

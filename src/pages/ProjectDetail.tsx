@@ -4,6 +4,7 @@ import { CommitImage, Project, ProjectCommit, ProjectStatus } from '../types'
 import { ArrowLeft, Camera, Folder, ImagePlus, Pencil, Plus, RotateCcw, Save, Star, Trash2, X } from 'lucide-react'
 import { SafeImage } from '../components/SafeImage'
 import { formatDateTime, getActivityLevel, getProjectCover, groupCommitsByDay } from '../lib/projectView'
+import { MOCK_MODE_LABEL, getMockProject, isMockProjectId, mockStatuses } from '../lib/mockData'
 
 export function ProjectDetail() {
   const { id } = useParams<{ id: string }>()
@@ -37,8 +38,9 @@ export function ProjectDetail() {
       window.ipcRenderer.invoke('get-project', id),
       window.ipcRenderer.invoke('get-statuses'),
     ])
-    setProject(p)
-    setStatuses(s)
+    const mockProject = !p && isMockProjectId(id) ? getMockProject(id) : null
+    setProject(mockProject || p)
+    setStatuses(mockProject ? mockStatuses : s)
   }
 
   const commits = project?.commits || []
@@ -46,6 +48,7 @@ export function ProjectDetail() {
 
   const createCommit = async () => {
     if (!project || !commitTitle.trim()) return
+    if (isMockProjectId(project.id)) return
     await window.ipcRenderer.invoke('create-commit', {
       projectId: project.id,
       title: commitTitle.trim(),
@@ -67,12 +70,14 @@ export function ProjectDetail() {
 
   const updateStatus = async (statusId: string) => {
     if (!project) return
+    if (isMockProjectId(project.id)) return
     await window.ipcRenderer.invoke('update-project', project.id, { status: statusId })
     loadData()
   }
 
   const saveProject = async () => {
     if (!project || !projectDraft.name.trim()) return
+    if (isMockProjectId(project.id)) return
     await window.ipcRenderer.invoke('update-project', project.id, {
       name: projectDraft.name.trim(),
       description: projectDraft.description.trim(),
@@ -84,6 +89,7 @@ export function ProjectDetail() {
 
   const setCoverFromPath = async (imagePath: string) => {
     if (!project) return
+    if (isMockProjectId(project.id)) return
     await window.ipcRenderer.invoke('update-project', project.id, { coverImagePath: imagePath })
     loadData()
   }
@@ -106,7 +112,10 @@ export function ProjectDetail() {
           <div>
             <div className="flex items-start justify-between gap-4">
               <div className="min-w-0 flex-1">
-                <p className="text-text-tertiary text-sm mb-2">Project Dossier</p>
+                <div className="flex items-center gap-2 mb-2">
+                  <p className="text-text-tertiary text-sm">Project Dossier</p>
+                  {isMockProjectId(project.id) && <span className="px-2.5 py-1 rounded-full bg-white/[0.08] border border-border-subtle text-[11px] text-text-secondary">{MOCK_MODE_LABEL}</span>}
+                </div>
                 {isEditingProject ? (
                   <input
                     value={projectDraft.name}
@@ -122,6 +131,7 @@ export function ProjectDetail() {
                 <select
                   value={project.status}
                   onChange={e => updateStatus(e.target.value)}
+                  disabled={isMockProjectId(project.id)}
                   className="bg-bg-tertiary border border-border-subtle rounded-full px-4 py-2 text-sm outline-none"
                   style={{ color: project.statusInfo?.color || undefined }}
                 >
@@ -129,6 +139,7 @@ export function ProjectDetail() {
                 </select>
                 <button
                   onClick={() => setIsEditingProject(prev => !prev)}
+                  disabled={isMockProjectId(project.id)}
                   className="w-9 h-9 rounded-full bg-bg-tertiary border border-border-subtle text-text-secondary hover:text-text-primary grid place-items-center transition-colors"
                   title={isEditingProject ? '收起编辑' : '编辑项目'}
                 >
@@ -218,8 +229,8 @@ export function ProjectDetail() {
                 <ImagePlus size={15} /> 选择截图
               </button>
               {commitImagePath && <span className="text-xs text-text-tertiary truncate flex-1 font-mono">{commitImagePath}</span>}
-              <button onClick={createCommit} className="ml-auto bg-text-primary text-primary rounded-full px-4 py-2 text-sm font-semibold flex items-center gap-2 transition-opacity hover:opacity-90">
-                <Plus size={15} /> 提交
+              <button onClick={createCommit} disabled={isMockProjectId(project.id)} className="ml-auto bg-text-primary text-primary rounded-full px-4 py-2 text-sm font-semibold flex items-center gap-2 transition-opacity hover:opacity-90 disabled:opacity-40">
+                <Plus size={15} /> {isMockProjectId(project.id) ? '展示中' : '提交'}
               </button>
             </div>
           </div>

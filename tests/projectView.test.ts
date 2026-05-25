@@ -1,6 +1,6 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
-import { getActivityLevel, getProjectCover, getRecentCommit } from '../src/lib/projectView.ts'
+import { getActivityLevel, getProjectCover, getRecentCommit, toImageSrc } from '../src/lib/projectView.ts'
 
 test('getActivityLevel maps commit counts into calm heatmap levels', () => {
   assert.equal(getActivityLevel(0), 0)
@@ -37,4 +37,9 @@ test('getProjectCover falls back to latest commit image', () => {
 test('getRecentCommit returns the first commit from an already sorted list', () => {
   const commit = { title: '最新进展' }
   assert.equal(getRecentCommit({ commits: [commit, { title: '旧进展' }] }), commit)
+})
+
+test('toImageSrc preserves data URI mock previews', () => {
+  const src = 'data:image/svg+xml;utf8,%3Csvg%3E%3C/svg%3E'
+  assert.equal(toImageSrc(src), src)
 })

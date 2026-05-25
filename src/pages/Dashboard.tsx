@@ -4,6 +4,7 @@ import { Project, ProjectCommit, ProjectStatus } from '../types'
 import { useNavigate } from 'react-router-dom'
 import { SafeImage } from '../components/SafeImage'
 import { formatDateKey, formatDateTime, getActivityLevel, getProjectCover, getRecentCommit, groupCommitsByDay } from '../lib/projectView'
+import { MOCK_MODE_LABEL, mockCommits, mockProjects, mockStatuses } from '../lib/mockData'
 
 export function Dashboard() {
   const [projects, setProjects] = useState<Project[]>([])
@@ -23,23 +24,31 @@ export function Dashboard() {
     })
   }, [])
 
+  const isMockMode = projects.length === 0
+  const displayProjects = isMockMode ? mockProjects : projects
+  const displayStatuses = isMockMode ? mockStatuses : statuses
+  const displayCommits = isMockMode ? mockCommits : allCommits
+
   const commits = useMemo(() => {
-    return projects
+    return displayProjects
       .map(project => ({ project, commit: getRecentCommit(project) }))
       .filter(item => item.commit)
       .sort((a, b) => (b.commit?.createdAt || 0) - (a.commit?.createdAt || 0))
       .slice(0, 8) as { project: Project; commit: ProjectCommit }[]
-  }, [projects])
+  }, [displayProjects])
 
-  const totalCommits = allCommits.length || projects.reduce((sum, project) => sum + (project.commitCount || 0), 0)
-  const recentSevenDayCount = allCommits.filter(commit => Date.now() - commit.createdAt <= 7 * 24 * 60 * 60 * 1000).length
+  const totalCommits = displayCommits.length || displayProjects.reduce((sum, project) => sum + (project.commitCount || 0), 0)
+  const recentSevenDayCount = displayCommits.filter(commit => Date.now() - commit.createdAt <= 7 * 24 * 60 * 60 * 1000).length
 
   return (
     <div className="flex flex-col min-h-full w-full py-8 px-10 gap-8">
       <div className="flex items-end justify-between">
         <div>
           <p className="text-text-tertiary text-sm mb-2">Vibe Progress Center</p>
-          <h1 className="text-[36px] font-semibold tracking-normal">项目进展总览</h1>
+          <div className="flex items-center gap-3">
+            <h1 className="text-[36px] font-semibold tracking-normal">项目进展总览</h1>
+            {isMockMode && <span className="px-3 py-1 rounded-full bg-white/[0.08] border border-border-subtle text-xs text-text-secondary">{MOCK_MODE_LABEL}</span>}
+          </div>
           <p className="text-text-secondary text-sm mt-2">用最近提交和活跃度观察每个 vibecoding 项目的生长节奏。</p>
         </div>
         <button onClick={() => navigate('/projects')} className="bg-text-primary text-primary rounded-full px-5 py-3 text-sm font-semibold flex items-center gap-2 transition-all duration-[180ms] hover:opacity-90">
@@ -49,10 +58,10 @@ export function Dashboard() {
       </div>
 
       <div className="grid grid-cols-4 gap-5">
-        <StatCard icon={<FolderOpen size={18} />} label="项目总数" value={projects.length.toString()} />
+        <StatCard icon={<FolderOpen size={18} />} label="项目总数" value={displayProjects.length.toString()} />
         <StatCard icon={<Sparkles size={18} />} label="进展提交" value={totalCommits.toString()} />
         <StatCard icon={<Activity size={18} />} label="近 7 日提交" value={recentSevenDayCount.toString()} />
-        <StatCard icon={<Clock3 size={18} />} label="自定义状态" value={statuses.length.toString()} />
+        <StatCard icon={<Clock3 size={18} />} label="自定义状态" value={displayStatuses.length.toString()} />
       </div>
 
       <div className="grid grid-cols-[1.25fr_0.75fr] gap-6 flex-1 min-h-[420px]">
@@ -65,7 +74,7 @@ export function Dashboard() {
             <button onClick={() => navigate('/projects')} className="text-sm text-text-secondary hover:text-text-primary transition-colors">查看画廊</button>
           </div>
           <div className="grid grid-cols-2 gap-4">
-            {projects.slice(0, 6).map(project => (
+            {displayProjects.slice(0, 6).map(project => (
               <button key={project.id} onClick={() => navigate(`/project/${project.id}`)} className="group text-left bg-bg-secondary border border-border-subtle rounded-[24px] overflow-hidden min-h-[210px] transition-all duration-[220ms] hover:bg-bg-tertiary hover:-translate-y-0.5">
                 <div className="h-24 bg-bg-tertiary overflow-hidden">
                   {getProjectCover(project) ? (
@@ -86,7 +95,7 @@ export function Dashboard() {
               </button>
             ))}
           </div>
-          {projects.length === 0 && (
+          {displayProjects.length === 0 && (
             <EmptyState text="还没有项目。去项目画廊创建第一个 vibecoding 项目。" />
           )}
         </section>
@@ -108,8 +117,8 @@ export function Dashboard() {
           <section className="glass-panel rounded-[30px] p-6">
             <h2 className="text-lg font-semibold mb-4">状态分布</h2>
             <div className="space-y-3">
-              {statuses.map(status => {
-                const count = projects.filter(project => project.status === status.id).length
+              {displayStatuses.map(status => {
+                const count = displayProjects.filter(project => project.status === status.id).length
                 return (
                   <div key={status.id} className="flex items-center justify-between text-sm">
                     <div className="flex items-center gap-2">
@@ -125,7 +134,7 @@ export function Dashboard() {
 
           <section className="glass-panel rounded-[30px] p-6">
             <h2 className="text-lg font-semibold mb-4">整体活跃热力</h2>
-            <MiniHeatmap commits={allCommits} />
+            <MiniHeatmap commits={displayCommits} />
           </section>
         </aside>
       </div>
