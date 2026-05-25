@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import { Project, ProjectCommit, ProjectStatus } from '../types'
-import { ArrowLeft, Camera, ImagePlus, Plus, Save, Trash2, X } from 'lucide-react'
+import { ArrowLeft, Camera, Folder, ImagePlus, Pencil, Plus, RotateCcw, Save, Trash2, X } from 'lucide-react'
 import { formatDateTime, getActivityLevel, getProjectCover, groupCommitsByDay, toImageSrc } from '../lib/projectView'
 
 export function ProjectDetail() {
@@ -14,10 +14,21 @@ export function ProjectDetail() {
   const [progressDelta, setProgressDelta] = useState('')
   const [commitImagePath, setCommitImagePath] = useState('')
   const [editingCommit, setEditingCommit] = useState<ProjectCommit | null>(null)
+  const [isEditingProject, setIsEditingProject] = useState(false)
+  const [projectDraft, setProjectDraft] = useState({ name: '', description: '', path: '' })
 
   useEffect(() => {
     loadData()
   }, [id])
+
+  useEffect(() => {
+    if (!project) return
+    setProjectDraft({
+      name: project.name || '',
+      description: project.description || '',
+      path: project.path || '',
+    })
+  }, [project?.id])
 
   const loadData = async () => {
     if (!id) return
@@ -59,10 +70,26 @@ export function ProjectDetail() {
     loadData()
   }
 
+  const saveProject = async () => {
+    if (!project || !projectDraft.name.trim()) return
+    await window.ipcRenderer.invoke('update-project', project.id, {
+      name: projectDraft.name.trim(),
+      description: projectDraft.description.trim(),
+      path: projectDraft.path.trim(),
+    })
+    setIsEditingProject(false)
+    loadData()
+  }
+
   const setCoverFromPath = async (imagePath: string) => {
     if (!project) return
     await window.ipcRenderer.invoke('update-project', project.id, { coverImagePath: imagePath })
     loadData()
+  }
+
+  const selectManualCover = async () => {
+    const path = await window.ipcRenderer.invoke('select-image')
+    if (path) setCoverFromPath(path)
   }
 
   if (!project) return <div className="p-10 text-text-secondary">正在读取项目...</div>
@@ -77,25 +104,69 @@ export function ProjectDetail() {
         <div className="glass-panel rounded-[32px] p-7 min-h-[260px] flex flex-col justify-between">
           <div>
             <div className="flex items-start justify-between gap-4">
-              <div>
+              <div className="min-w-0 flex-1">
                 <p className="text-text-tertiary text-sm mb-2">Project Dossier</p>
-                <h1 className="text-[38px] font-semibold tracking-normal">{project.name}</h1>
+                {isEditingProject ? (
+                  <input
+                    value={projectDraft.name}
+                    onChange={e => setProjectDraft(prev => ({ ...prev, name: e.target.value }))}
+                    className="w-full bg-bg-tertiary border border-border-subtle rounded-[22px] px-4 py-3 text-[30px] font-semibold outline-none focus:border-border-primary"
+                    placeholder="项目名称"
+                  />
+                ) : (
+                  <h1 className="text-[38px] font-semibold tracking-normal truncate">{project.name}</h1>
+                )}
               </div>
-              <select
-                value={project.status}
-                onChange={e => updateStatus(e.target.value)}
-                className="bg-bg-tertiary border border-border-subtle rounded-full px-4 py-2 text-sm outline-none"
-                style={{ color: project.statusInfo?.color || undefined }}
-              >
-                {statuses.map(status => <option key={status.id} value={status.id}>{status.name}</option>)}
-              </select>
+              <div className="flex items-center gap-2 flex-shrink-0">
+                <select
+                  value={project.status}
+                  onChange={e => updateStatus(e.target.value)}
+                  className="bg-bg-tertiary border border-border-subtle rounded-full px-4 py-2 text-sm outline-none"
+                  style={{ color: project.statusInfo?.color || undefined }}
+                >
+                  {statuses.map(status => <option key={status.id} value={status.id}>{status.name}</option>)}
+                </select>
+                <button
+                  onClick={() => setIsEditingProject(prev => !prev)}
+                  className="w-9 h-9 rounded-full bg-bg-tertiary border border-border-subtle text-text-secondary hover:text-text-primary grid place-items-center transition-colors"
+                  title={isEditingProject ? '收起编辑' : '编辑项目'}
+                >
+                  {isEditingProject ? <X size={15} /> : <Pencil size={15} />}
+                </button>
+              </div>
             </div>
-            <p className="text-text-secondary leading-7 mt-5 max-w-3xl">{project.description || '这个项目还没有简介。可以在之后的编辑面板里补充它的故事。'}</p>
+            {isEditingProject ? (
+              <div className="mt-5 space-y-3">
+                <textarea
+                  value={projectDraft.description}
+                  onChange={e => setProjectDraft(prev => ({ ...prev, description: e.target.value }))}
+                  className="w-full bg-bg-tertiary border border-border-subtle rounded-[22px] px-4 py-3 text-sm leading-6 outline-none focus:border-border-primary resize-none h-28"
+                  placeholder="这个项目想解决什么？当前做到哪里了？"
+                />
+                <div className="grid grid-cols-[1fr_auto] gap-3">
+                  <input
+                    value={projectDraft.path}
+                    onChange={e => setProjectDraft(prev => ({ ...prev, path: e.target.value }))}
+                    className="bg-bg-tertiary border border-border-subtle rounded-full px-4 py-2.5 text-sm outline-none focus:border-border-primary font-mono"
+                    placeholder="本地项目路径，可选"
+                  />
+                  <button
+                    onClick={saveProject}
+                    disabled={!projectDraft.name.trim()}
+                    className="bg-text-primary text-primary rounded-full px-4 py-2.5 text-sm font-semibold flex items-center gap-2 transition-opacity hover:opacity-90 disabled:opacity-40"
+                  >
+                    <Save size={15} /> 保存项目
+                  </button>
+                </div>
+              </div>
+            ) : (
+              <p className="text-text-secondary leading-7 mt-5 max-w-3xl">{project.description || '这个项目还没有简介。打开编辑后补上一段，让它更像一个可持续跟进的作品档案。'}</p>
+            )}
           </div>
           <div className="flex items-center gap-3 flex-wrap mt-6">
             <span className="px-3 py-1.5 rounded-full bg-bg-tertiary border border-border-subtle text-sm text-text-secondary">{commits.length} 次提交</span>
             <span className="px-3 py-1.5 rounded-full bg-bg-tertiary border border-border-subtle text-sm text-text-secondary font-mono">updated {formatDateTime(project.updatedAt)}</span>
-            {project.path && <span className="px-3 py-1.5 rounded-full bg-bg-tertiary border border-border-subtle text-sm text-text-tertiary font-mono truncate max-w-[420px]">{project.path}</span>}
+            {project.path && <span className="px-3 py-1.5 rounded-full bg-bg-tertiary border border-border-subtle text-sm text-text-tertiary font-mono truncate max-w-[420px] flex items-center gap-2"><Folder size={13} /> {project.path}</span>}
           </div>
         </div>
 
@@ -103,14 +174,24 @@ export function ProjectDetail() {
           {cover ? (
             <div className="relative h-full min-h-[260px] group">
               <img src={toImageSrc(cover)} className="w-full h-full object-cover" />
-              <div className="absolute inset-x-0 bottom-0 p-4 bg-gradient-to-t from-black/60 to-transparent">
-                <button onClick={() => setCoverFromPath('')} className="text-xs text-white/80 hover:text-white">清除手动封面</button>
+              <div className="absolute inset-x-0 bottom-0 p-4 bg-gradient-to-t from-black/65 to-transparent flex items-center gap-2">
+                <button onClick={selectManualCover} className="px-3 py-1.5 rounded-full bg-white/12 border border-white/15 text-xs text-white/85 hover:text-white backdrop-blur-md flex items-center gap-1.5">
+                  <ImagePlus size={13} /> 更换封面
+                </button>
+                {project.coverImagePath && (
+                  <button onClick={() => setCoverFromPath('')} className="px-3 py-1.5 rounded-full bg-white/12 border border-white/15 text-xs text-white/85 hover:text-white backdrop-blur-md flex items-center gap-1.5">
+                    <RotateCcw size={13} /> 使用自动封面
+                  </button>
+                )}
               </div>
             </div>
           ) : (
             <div className="h-full min-h-[260px] p-6 flex flex-col justify-end text-text-tertiary bg-bg-tertiary/40">
               <Camera size={34} className="mb-4 opacity-70" />
               <p className="text-sm">添加带截图的 commit 后，这里会自动显示项目封面。</p>
+              <button onClick={selectManualCover} className="mt-4 self-start px-4 py-2 rounded-full bg-bg-secondary border border-border-subtle text-sm text-text-secondary hover:text-text-primary flex items-center gap-2 transition-colors">
+                <ImagePlus size={15} /> 手动选择封面
+              </button>
             </div>
           )}
         </div>
