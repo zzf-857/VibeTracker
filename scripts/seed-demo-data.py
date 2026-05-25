@@ -32,6 +32,7 @@ PROJECTS = [
         "name": "VibeTracker",
         "description": "可视化跟进 vibecoding 项目进度，把每一次推进沉淀成 commit 式时间线。",
         "path": r"C:\Projects\VibeTracker",
+        "repo_url": "https://github.com/zzf-857/VibeTracker",
         "status": "demo-status-design",
         "cover": "vibetracker-gallery.png",
         "created_ago": 36,
@@ -49,6 +50,7 @@ PROJECTS = [
         "name": "Prompt Pocket",
         "description": "轻量记录 vibecoding 过程中冒出来的好提示词和工程思路，不做重型 prompt 库。",
         "path": r"C:\Projects\PromptPocket",
+        "repo_url": "https://github.com/zzf-857/PromptPocket",
         "status": "demo-status-developing",
         "cover": "prompt-pocket-notes.png",
         "created_ago": 24,
@@ -65,6 +67,7 @@ PROJECTS = [
         "name": "Release Desk",
         "description": "管理本地桌面工具从 demo 到可发布版本的检查清单和发布节奏。",
         "path": r"C:\Projects\ReleaseDesk",
+        "repo_url": "https://github.com/zzf-857/ReleaseDesk",
         "status": "demo-status-demo",
         "cover": "release-desk-board.png",
         "created_ago": 18,
@@ -81,6 +84,7 @@ PROJECTS = [
         "name": "Motion Lab",
         "description": "试验页面进出场、面板呼吸、状态变化和组件 hover 的微动效节奏。",
         "path": r"C:\Projects\MotionLab",
+        "repo_url": "https://github.com/zzf-857/MotionLab",
         "status": "demo-status-design",
         "cover": "motion-lab-timeline.png",
         "created_ago": 14,
@@ -106,6 +110,10 @@ def main() -> None:
     with sqlite3.connect(DB_PATH) as conn:
         conn.execute("PRAGMA foreign_keys = ON")
         cur = conn.cursor()
+
+        columns = {row[1] for row in cur.execute("PRAGMA table_info(projects)").fetchall()}
+        if "repoUrl" not in columns:
+            cur.execute('ALTER TABLE projects ADD COLUMN repoUrl TEXT DEFAULT ""')
 
         for project in PROJECTS:
             cur.execute("DELETE FROM projects WHERE id = ?", (project["id"],))
@@ -141,14 +149,15 @@ def main() -> None:
             updated_at = NOW - project["updated_ago"] * DAY
             cur.execute(
                 """
-                INSERT INTO projects (id, name, description, path, status, progress, coverImagePath, createdAt, updatedAt)
-                VALUES (?, ?, ?, ?, ?, 0, ?, ?, ?)
+                INSERT INTO projects (id, name, description, path, repoUrl, status, progress, coverImagePath, createdAt, updatedAt)
+                VALUES (?, ?, ?, ?, ?, ?, 0, ?, ?, ?)
                 """,
                 (
                     project["id"],
                     project["name"],
                     project["description"],
                     project["path"],
+                    project["repo_url"],
                     project["status"],
                     image_path(project["cover"]),
                     created_at,

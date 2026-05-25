@@ -15,6 +15,8 @@ if (!window.ipcRenderer) {
       if (channel === 'create-project') return crypto.randomUUID()
       if (channel === 'delete-status') return { ok: false, reason: '浏览器预览不可删除状态' }
       if (channel === 'select-image') return null
+      if (channel === 'open-local-path') return { ok: false, reason: '浏览器预览不可打开本地路径' }
+      if (channel === 'open-external-url') return { ok: true }
       if (channel === 'read-image-data-url') return null
       return []
     },

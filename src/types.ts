@@ -57,6 +57,7 @@ export interface Project {
   name: string
   description: string
   path: string
+  repoUrl: string
   status: string
   statusInfo?: ProjectStatus
   progress: number
@@ -85,6 +86,8 @@ export interface IpcRenderer {
   invoke(channel: 'delete-status', id: string): Promise<{ ok: boolean; reason?: string }>
   invoke(channel: 'reorder-statuses', orderedIds: string[]): Promise<boolean>
   invoke(channel: 'select-image'): Promise<string | null>
+  invoke(channel: 'open-local-path', localPath: string): Promise<{ ok: boolean; reason?: string }>
+  invoke(channel: 'open-external-url', url: string): Promise<{ ok: boolean; reason?: string }>
   invoke(channel: 'read-image-data-url', imagePath: string): Promise<string | null>
 
   invoke(channel: 'get-commits', projectId: string): Promise<ProjectCommit[]>

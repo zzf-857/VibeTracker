@@ -72,6 +72,10 @@ if (!columnExists('projects', 'coverImagePath')) {
   db.prepare('ALTER TABLE projects ADD COLUMN coverImagePath TEXT DEFAULT ""').run()
 }
 
+if (!columnExists('projects', 'repoUrl')) {
+  db.prepare('ALTER TABLE projects ADD COLUMN repoUrl TEXT DEFAULT ""').run()
+}
+
 db.exec(`
   CREATE TABLE IF NOT EXISTS project_statuses (
     id TEXT PRIMARY KEY,

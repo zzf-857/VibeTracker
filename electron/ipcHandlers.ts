@@ -1,4 +1,4 @@
-import { dialog, ipcMain } from 'electron'
+import { dialog, ipcMain, shell } from 'electron'
 import db from './database'
 import fs from 'node:fs/promises'
 import path from 'node:path'
@@ -90,7 +90,7 @@ export function setupIpcHandlers() {
     const fields = []
     const values = []
     
-    const allowedFields = ['name', 'description', 'path', 'status', 'progress', 'coverImagePath']
+    const allowedFields = ['name', 'description', 'path', 'status', 'progress', 'coverImagePath', 'repoUrl']
     for (const key of allowedFields) {
       if (data[key] !== undefined) {
         fields.push(`${key} = ?`)
@@ -183,6 +183,18 @@ export function setupIpcHandlers() {
       ]
     })
     return result.canceled ? null : result.filePaths[0]
+  })
+
+  ipcMain.handle('open-local-path', async (_, localPath: string) => {
+    if (!localPath) return { ok: false, reason: '缺少本地路径' }
+    const result = await shell.openPath(localPath)
+    return result ? { ok: false, reason: result } : { ok: true }
+  })
+
+  ipcMain.handle('open-external-url', async (_, url: string) => {
+    if (!/^https?:\/\//i.test(url || '')) return { ok: false, reason: '链接必须以 http:// 或 https:// 开头' }
+    await shell.openExternal(url)
+    return { ok: true }
   })
 
   ipcMain.handle('read-image-data-url', async (_, imagePath: string) => {

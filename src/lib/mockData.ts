@@ -79,6 +79,7 @@ export const mockProjects: Project[] = [
     name: 'VibeTracker',
     description: '可视化跟进 vibecoding 项目进度，把每一次推进沉淀成 commit 式时间线。',
     path: 'C:\\Projects\\VibeTracker',
+    repoUrl: 'https://github.com/zzf-857/VibeTracker',
     status: 'mock-status-polish',
     statusInfo: mockStatuses[1],
     progress: 0,
@@ -99,6 +100,7 @@ export const mockProjects: Project[] = [
     name: 'Prompt Pocket',
     description: '轻量记录 vibecoding 过程中突然冒出来的好提示词和工程思路。',
     path: 'C:\\Projects\\PromptPocket',
+    repoUrl: 'https://github.com/zzf-857/PromptPocket',
     status: 'mock-status-prototype',
     statusInfo: mockStatuses[0],
     progress: 0,
@@ -118,6 +120,7 @@ export const mockProjects: Project[] = [
     name: 'Release Desk',
     description: '管理本地桌面工具从 demo 到可发布版本的检查清单。',
     path: 'C:\\Projects\\ReleaseDesk',
+    repoUrl: 'https://github.com/zzf-857/ReleaseDesk',
     status: 'mock-status-demo',
     statusInfo: mockStatuses[2],
     progress: 0,
@@ -137,6 +140,7 @@ export const mockProjects: Project[] = [
     name: 'Motion Lab',
     description: '专门试验页面进出场、面板呼吸和状态变化的微动效。',
     path: 'C:\\Projects\\MotionLab',
+    repoUrl: 'https://github.com/zzf-857/MotionLab',
     status: 'mock-status-polish',
     statusInfo: mockStatuses[1],
     progress: 0,
@@ -162,4 +166,3 @@ export function isMockProjectId(id: string | undefined) {
 export function getMockProject(id: string | undefined) {
   return mockProjects.find(project => project.id === id) || null
 }
-

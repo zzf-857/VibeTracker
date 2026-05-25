@@ -1,7 +1,7 @@
 import { type CSSProperties, useEffect, useMemo, useState } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import { CommitImage, Project, ProjectCommit, ProjectStatus } from '../types'
-import { ArrowLeft, Camera, Folder, ImagePlus, Pencil, Plus, RotateCcw, Save, Star, Trash2, X } from 'lucide-react'
+import { ArrowLeft, Camera, ExternalLink, Folder, Github, ImagePlus, Pencil, Plus, RotateCcw, Save, Star, Trash2, X } from 'lucide-react'
 import { SafeImage } from '../components/SafeImage'
 import { formatDateTime, getActivityLevel, getProjectCover, groupCommitsByDay } from '../lib/projectView'
 import { MOCK_MODE_LABEL, getMockProject, isMockProjectId, mockStatuses } from '../lib/mockData'
@@ -17,7 +17,7 @@ export function ProjectDetail() {
   const [commitImagePath, setCommitImagePath] = useState('')
   const [editingCommit, setEditingCommit] = useState<ProjectCommit | null>(null)
   const [isEditingProject, setIsEditingProject] = useState(false)
-  const [projectDraft, setProjectDraft] = useState({ name: '', description: '', path: '' })
+  const [projectDraft, setProjectDraft] = useState({ name: '', description: '', path: '', repoUrl: '' })
 
   useEffect(() => {
     loadData()
@@ -29,6 +29,7 @@ export function ProjectDetail() {
       name: project.name || '',
       description: project.description || '',
       path: project.path || '',
+      repoUrl: project.repoUrl || '',
     })
   }, [project?.id])
 
@@ -82,6 +83,7 @@ export function ProjectDetail() {
       name: projectDraft.name.trim(),
       description: projectDraft.description.trim(),
       path: projectDraft.path.trim(),
+      repoUrl: projectDraft.repoUrl.trim(),
     })
     setIsEditingProject(false)
     loadData()
@@ -97,6 +99,18 @@ export function ProjectDetail() {
   const selectManualCover = async () => {
     const path = await window.ipcRenderer.invoke('select-image')
     if (path) setCoverFromPath(path)
+  }
+
+  const openLocalPath = async () => {
+    if (!project?.path) return
+    const result = await window.ipcRenderer.invoke('open-local-path', project.path)
+    if (!result.ok) alert(result.reason || '无法打开本地路径')
+  }
+
+  const openRepoUrl = async () => {
+    if (!project?.repoUrl) return
+    const result = await window.ipcRenderer.invoke('open-external-url', project.repoUrl)
+    if (!result.ok) alert(result.reason || '无法打开远端仓库')
   }
 
   if (!project) return <div className="p-10 text-text-secondary">正在读取项目...</div>
@@ -155,12 +169,18 @@ export function ProjectDetail() {
                   className="w-full bg-bg-tertiary border border-border-subtle rounded-[22px] px-4 py-3 text-sm leading-6 outline-none focus:border-border-primary resize-none h-28"
                   placeholder="这个项目想解决什么？当前做到哪里了？"
                 />
-                <div className="grid grid-cols-[1fr_auto] gap-3">
+                <div className="grid grid-cols-[1fr_1fr_auto] gap-3">
                   <input
                     value={projectDraft.path}
                     onChange={e => setProjectDraft(prev => ({ ...prev, path: e.target.value }))}
-                    className="bg-bg-tertiary border border-border-subtle rounded-full px-4 py-2.5 text-sm outline-none focus:border-border-primary font-mono"
+                    className="min-w-0 bg-bg-tertiary border border-border-subtle rounded-full px-4 py-2.5 text-sm outline-none focus:border-border-primary font-mono"
                     placeholder="本地项目路径，可选"
+                  />
+                  <input
+                    value={projectDraft.repoUrl}
+                    onChange={e => setProjectDraft(prev => ({ ...prev, repoUrl: e.target.value }))}
+                    className="min-w-0 bg-bg-tertiary border border-border-subtle rounded-full px-4 py-2.5 text-sm outline-none focus:border-border-primary font-mono"
+                    placeholder="GitHub 仓库网址，可选"
                   />
                   <button
                     onClick={saveProject}
@@ -178,7 +198,16 @@ export function ProjectDetail() {
           <div className="flex items-center gap-3 flex-wrap mt-6">
             <span className="px-3 py-1.5 rounded-full bg-bg-tertiary border border-border-subtle text-sm text-text-secondary">{commits.length} 次提交</span>
             <span className="px-3 py-1.5 rounded-full bg-bg-tertiary border border-border-subtle text-sm text-text-secondary font-mono">updated {formatDateTime(project.updatedAt)}</span>
-            {project.path && <span className="px-3 py-1.5 rounded-full bg-bg-tertiary border border-border-subtle text-sm text-text-tertiary font-mono truncate max-w-[420px] flex items-center gap-2"><Folder size={13} /> {project.path}</span>}
+            {project.path && (
+              <button onClick={openLocalPath} className="px-3 py-1.5 rounded-full bg-bg-tertiary border border-border-subtle text-sm text-text-tertiary hover:text-text-primary font-mono truncate max-w-[420px] flex items-center gap-2 transition-colors" title="打开本地项目文件夹">
+                <Folder size={13} /> {project.path}
+              </button>
+            )}
+            {project.repoUrl && (
+              <button onClick={openRepoUrl} className="px-3 py-1.5 rounded-full bg-bg-tertiary border border-border-subtle text-sm text-text-tertiary hover:text-text-primary font-mono truncate max-w-[360px] flex items-center gap-2 transition-colors" title="在浏览器打开远端仓库">
+                <Github size={13} /> GitHub <ExternalLink size={12} />
+              </button>
+            )}
           </div>
         </div>
 
