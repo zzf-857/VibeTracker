@@ -2,20 +2,24 @@ import { useEffect, useMemo, useState } from 'react'
 import { Activity, Clock3, FolderOpen, Plus, Sparkles } from 'lucide-react'
 import { Project, ProjectCommit, ProjectStatus } from '../types'
 import { useNavigate } from 'react-router-dom'
-import { formatDateTime, getActivityLevel, getProjectCover, getRecentCommit, toImageSrc } from '../lib/projectView'
+import { SafeImage } from '../components/SafeImage'
+import { formatDateKey, formatDateTime, getActivityLevel, getProjectCover, getRecentCommit, groupCommitsByDay } from '../lib/projectView'
 
 export function Dashboard() {
   const [projects, setProjects] = useState<Project[]>([])
   const [statuses, setStatuses] = useState<ProjectStatus[]>([])
+  const [allCommits, setAllCommits] = useState<ProjectCommit[]>([])
   const navigate = useNavigate()
 
   useEffect(() => {
     Promise.all([
       window.ipcRenderer.invoke('get-projects'),
       window.ipcRenderer.invoke('get-statuses'),
-    ]).then(([p, s]) => {
+    ]).then(async ([p, s]) => {
       setProjects(p)
       setStatuses(s)
+      const commits = await Promise.all(p.map((project: Project) => window.ipcRenderer.invoke('get-commits', project.id)))
+      setAllCommits(commits.flat())
     })
   }, [])
 
@@ -27,7 +31,8 @@ export function Dashboard() {
       .slice(0, 8) as { project: Project; commit: ProjectCommit }[]
   }, [projects])
 
-  const totalCommits = projects.reduce((sum, project) => sum + (project.commitCount || 0), 0)
+  const totalCommits = allCommits.length || projects.reduce((sum, project) => sum + (project.commitCount || 0), 0)
+  const recentSevenDayCount = allCommits.filter(commit => Date.now() - commit.createdAt <= 7 * 24 * 60 * 60 * 1000).length
 
   return (
     <div className="flex flex-col min-h-full w-full py-8 px-10 gap-8">
@@ -46,7 +51,7 @@ export function Dashboard() {
       <div className="grid grid-cols-4 gap-5">
         <StatCard icon={<FolderOpen size={18} />} label="项目总数" value={projects.length.toString()} />
         <StatCard icon={<Sparkles size={18} />} label="进展提交" value={totalCommits.toString()} />
-        <StatCard icon={<Activity size={18} />} label="活跃项目" value={projects.filter(p => (p.commitCount || 0) > 0).length.toString()} />
+        <StatCard icon={<Activity size={18} />} label="近 7 日提交" value={recentSevenDayCount.toString()} />
         <StatCard icon={<Clock3 size={18} />} label="自定义状态" value={statuses.length.toString()} />
       </div>
 
@@ -64,7 +69,7 @@ export function Dashboard() {
               <button key={project.id} onClick={() => navigate(`/project/${project.id}`)} className="group text-left bg-bg-secondary border border-border-subtle rounded-[24px] overflow-hidden min-h-[210px] transition-all duration-[220ms] hover:bg-bg-tertiary hover:-translate-y-0.5">
                 <div className="h-24 bg-bg-tertiary overflow-hidden">
                   {getProjectCover(project) ? (
-                    <img src={toImageSrc(getProjectCover(project))} className="w-full h-full object-cover transition-transform duration-300 group-hover:scale-[1.03]" />
+                    <SafeImage src={getProjectCover(project)} alt={`${project.name} 封面`} className="w-full h-full object-cover transition-transform duration-300 group-hover:scale-[1.03]" />
                   ) : (
                     <div className="h-full flex items-end p-4 text-text-tertiary text-sm">文字项目卡片</div>
                   )}
@@ -120,7 +125,7 @@ export function Dashboard() {
 
           <section className="glass-panel rounded-[30px] p-6">
             <h2 className="text-lg font-semibold mb-4">整体活跃热力</h2>
-            <MiniHeatmap commits={totalCommits} />
+            <MiniHeatmap commits={allCommits} />
           </section>
         </aside>
       </div>
@@ -148,13 +153,23 @@ function EmptyState({ text, compact = false }: { text: string; compact?: boolean
   )
 }
 
-function MiniHeatmap({ commits }: { commits: number }) {
+function MiniHeatmap({ commits }: { commits: ProjectCommit[] }) {
+  const counts = useMemo(() => groupCommitsByDay(commits), [commits])
+  const days = useMemo(() => {
+    return Array.from({ length: 56 }).map((_, index) => {
+      const date = new Date()
+      date.setDate(date.getDate() - (55 - index))
+      const key = formatDateKey(date.getTime())
+      const count = counts.get(key) || 0
+      return { key, count, level: getActivityLevel(count) }
+    })
+  }, [counts])
+
   return (
-    <div className="grid grid-cols-12 gap-1">
-      {Array.from({ length: 36 }).map((_, index) => {
-        const level = index > 35 - Math.min(commits, 35) ? getActivityLevel((index % 5) + 1) : 0
-        const className = ['bg-bg-tertiary', 'bg-status-completed/25', 'bg-status-completed/45', 'bg-status-completed/70', 'bg-status-completed'][level]
-        return <span key={index} className={`aspect-square rounded-[4px] ${className}`} />
+    <div className="grid grid-cols-14 gap-1">
+      {days.map(day => {
+        const className = ['bg-bg-tertiary', 'bg-status-completed/25', 'bg-status-completed/45', 'bg-status-completed/70', 'bg-status-completed'][day.level]
+        return <span key={day.key} title={`${day.key}: ${day.count} 次提交`} className={`aspect-square rounded-[4px] ${className}`} />
       })}
     </div>
   )

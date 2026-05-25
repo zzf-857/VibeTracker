@@ -1,8 +1,9 @@
 import { useEffect, useMemo, useState } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import { CommitImage, Project, ProjectCommit, ProjectStatus } from '../types'
-import { ArrowLeft, Camera, Folder, ImageOff, ImagePlus, Pencil, Plus, RotateCcw, Save, Star, Trash2, X } from 'lucide-react'
-import { formatDateTime, getActivityLevel, getProjectCover, groupCommitsByDay, toImageSrc } from '../lib/projectView'
+import { ArrowLeft, Camera, Folder, ImagePlus, Pencil, Plus, RotateCcw, Save, Star, Trash2, X } from 'lucide-react'
+import { SafeImage } from '../components/SafeImage'
+import { formatDateTime, getActivityLevel, getProjectCover, groupCommitsByDay } from '../lib/projectView'
 
 export function ProjectDetail() {
   const { id } = useParams<{ id: string }>()
@@ -412,28 +413,13 @@ function CommitEditor({
   )
 }
 
-function SafeImage({ src, alt, className }: { src: string; alt: string; className?: string }) {
-  const [failed, setFailed] = useState(false)
-  if (failed || !src) {
-    return (
-      <div className="w-full h-full grid place-items-center bg-bg-tertiary text-text-tertiary">
-        <div className="flex flex-col items-center gap-2 text-[11px]">
-          <ImageOff size={18} />
-          图片不可用
-        </div>
-      </div>
-    )
-  }
-  return <img src={toImageSrc(src)} alt={alt} className={className} onError={() => setFailed(true)} />
-}
-
 function CommitHeatmap({ commits }: { commits: ProjectCommit[] }) {
   const counts = useMemo(() => groupCommitsByDay(commits), [commits])
   const days = useMemo(() => {
     return Array.from({ length: 70 }).map((_, index) => {
       const date = new Date()
       date.setDate(date.getDate() - (69 - index))
-      const key = date.toISOString().slice(0, 10)
+      const key = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`
       const count = counts.get(key) || 0
       return { key, count, level: getActivityLevel(count) }
     })

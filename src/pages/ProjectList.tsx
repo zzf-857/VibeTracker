@@ -1,8 +1,9 @@
 import { useEffect, useMemo, useState } from 'react'
 import { Project, ProjectStatus, Tag } from '../types'
-import { Search, Plus, Image, Sparkles } from 'lucide-react'
+import { Search, Plus, Image, Sparkles, Folder } from 'lucide-react'
 import { useNavigate } from 'react-router-dom'
-import { formatDateTime, getProjectCover, getRecentCommit, toImageSrc } from '../lib/projectView'
+import { SafeImage } from '../components/SafeImage'
+import { formatDateTime, getProjectCover, getRecentCommit } from '../lib/projectView'
 
 export function ProjectList() {
   const [projects, setProjects] = useState<Project[]>([])
@@ -12,6 +13,8 @@ export function ProjectList() {
   const [activeTag, setActiveTag] = useState<string | null>(null)
   const [newProjectName, setNewProjectName] = useState('')
   const [newProjectDescription, setNewProjectDescription] = useState('')
+  const [newProjectPath, setNewProjectPath] = useState('')
+  const [newProjectStatus, setNewProjectStatus] = useState('')
   const navigate = useNavigate()
 
   useEffect(() => {
@@ -27,6 +30,7 @@ export function ProjectList() {
     setProjects(p)
     setTags(t)
     setStatuses(s)
+    if (!newProjectStatus && s[0]) setNewProjectStatus(s[0].id)
   }
 
   const filteredProjects = useMemo(() => {
@@ -44,12 +48,13 @@ export function ProjectList() {
     const id = await window.ipcRenderer.invoke('create-project', {
       name: newProjectName.trim(),
       description: newProjectDescription.trim(),
-      path: '',
-      status: statuses[0]?.id,
+      path: newProjectPath.trim(),
+      status: newProjectStatus || statuses[0]?.id,
       progress: 0,
     })
     setNewProjectName('')
     setNewProjectDescription('')
+    setNewProjectPath('')
     navigate(`/project/${id}`)
   }
 
@@ -61,7 +66,7 @@ export function ProjectList() {
           <h1 className="text-[34px] font-semibold tracking-normal">项目画廊</h1>
           <p className="text-text-secondary text-sm mt-2">用封面和最近提交扫一眼每个 vibecoding 项目的状态。</p>
         </div>
-        <div className="glass-panel rounded-[28px] p-4 w-[430px]">
+        <div className="glass-panel rounded-[28px] p-4 w-[520px]">
           <div className="flex items-center gap-2 mb-3 text-sm font-semibold">
             <Sparkles size={16} className="text-accent-blue" />
             新建项目
@@ -73,14 +78,29 @@ export function ProjectList() {
               className="bg-bg-tertiary border border-border-subtle rounded-2xl px-4 py-2.5 text-sm outline-none focus:border-border-primary"
               placeholder="项目名称"
             />
-            <div className="flex gap-2">
+            <div className="grid grid-cols-[1fr_150px] gap-2">
               <input
                 value={newProjectDescription}
                 onChange={e => setNewProjectDescription(e.target.value)}
-                className="flex-1 bg-bg-tertiary border border-border-subtle rounded-2xl px-4 py-2.5 text-sm outline-none focus:border-border-primary"
+                className="bg-bg-tertiary border border-border-subtle rounded-2xl px-4 py-2.5 text-sm outline-none focus:border-border-primary"
                 placeholder="一句话介绍这个项目"
               />
-              <button onClick={createProject} className="bg-text-primary text-primary rounded-full px-4 text-sm font-semibold flex items-center gap-2 transition-all duration-[180ms] hover:opacity-90">
+              <select
+                value={newProjectStatus}
+                onChange={e => setNewProjectStatus(e.target.value)}
+                className="bg-bg-tertiary border border-border-subtle rounded-2xl px-3 py-2.5 text-sm outline-none focus:border-border-primary"
+              >
+                {statuses.map(status => <option key={status.id} value={status.id}>{status.name}</option>)}
+              </select>
+            </div>
+            <div className="grid grid-cols-[1fr_auto] gap-2">
+              <input
+                value={newProjectPath}
+                onChange={e => setNewProjectPath(e.target.value)}
+                className="bg-bg-tertiary border border-border-subtle rounded-2xl px-4 py-2.5 text-sm outline-none focus:border-border-primary font-mono"
+                placeholder="本地路径，可选"
+              />
+              <button onClick={createProject} disabled={!newProjectName.trim()} className="bg-text-primary text-primary rounded-full px-4 text-sm font-semibold flex items-center gap-2 transition-all duration-[180ms] hover:opacity-90 disabled:opacity-40">
                 <Plus size={15} /> 创建
               </button>
             </div>
@@ -148,7 +168,7 @@ function ProjectGalleryCard({ project, onOpen }: { project: Project; onOpen: () 
     >
       {cover ? (
         <div className="h-44 overflow-hidden bg-bg-tertiary">
-          <img src={toImageSrc(cover)} className="h-full w-full object-cover transition-transform duration-300 group-hover:scale-[1.03]" />
+          <SafeImage src={cover} alt={`${project.name} 封面`} className="h-full w-full object-cover transition-transform duration-300 group-hover:scale-[1.03]" />
         </div>
       ) : (
         <div className="h-44 p-5 flex flex-col justify-end bg-bg-tertiary/60">
@@ -169,9 +189,24 @@ function ProjectGalleryCard({ project, onOpen }: { project: Project; onOpen: () 
         </div>
         <p className="text-sm text-text-secondary mt-3 line-clamp-2 min-h-[42px]">{project.description || '这个项目还没有简介。'}</p>
         <div className="mt-auto pt-5 border-t border-border-subtle">
-          <p className="text-xs text-text-tertiary mb-2 font-mono">{recentCommit ? formatDateTime(recentCommit.createdAt) : 'NO COMMIT YET'}</p>
+        <p className="text-xs text-text-tertiary mb-2 font-mono">{recentCommit ? formatDateTime(recentCommit.createdAt) : 'NO COMMIT YET'}</p>
           <p className="text-sm text-text-primary font-medium truncate">{recentCommit?.title || '还没有进展提交'}</p>
-          <p className="text-xs text-text-tertiary mt-2">{project.commitCount || 0} 次提交</p>
+          <div className="flex items-center justify-between gap-3 mt-3">
+            <div className="flex items-center gap-1.5 min-w-0">
+              {(project.tags || []).slice(0, 3).map(tag => (
+                <span key={tag.id} className="px-2 py-1 rounded-full bg-white/[0.06] text-[11px] text-text-secondary flex items-center gap-1.5">
+                  <span className="w-1.5 h-1.5 rounded-full" style={{ backgroundColor: tag.color }} />
+                  {tag.name}
+                </span>
+              ))}
+              {project.path && (project.tags || []).length === 0 && (
+                <span className="text-[11px] text-text-tertiary font-mono truncate flex items-center gap-1.5">
+                  <Folder size={12} /> {project.path}
+                </span>
+              )}
+            </div>
+            <p className="text-xs text-text-tertiary flex-shrink-0">{project.commitCount || 0} 次提交</p>
+          </div>
         </div>
       </div>
     </button>
