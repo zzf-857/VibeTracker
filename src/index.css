@@ -202,6 +202,17 @@ body {
   }
 }
 
+@keyframes panelSlideIn {
+  from {
+    opacity: 0;
+    transform: translateX(18px);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(0);
+  }
+}
+
 /* Custom Scrollbar for global scrollable areas */
 ::-webkit-scrollbar {
   width: 6px;

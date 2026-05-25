@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { type CSSProperties, useEffect, useState } from 'react'
 import { AlertTriangle, ArrowDown, ArrowUp, Check, Palette, Plus, Save, Trash2, X } from 'lucide-react'
 import { ProjectStatus } from '../types'
 import { validateStatusName } from '../lib/statusValidation'
@@ -80,15 +80,15 @@ export function Settings() {
   }
 
   return (
-    <div className="flex flex-col min-h-full w-full py-8 px-10 gap-8">
-      <div>
+    <div className="page-enter flex flex-col min-h-full w-full py-8 px-10 gap-8">
+      <div className="stagger-item" style={{ '--stagger': 0 } as CSSProperties}>
         <p className="text-text-tertiary text-sm mb-2">Preferences</p>
         <h1 className="text-[34px] font-semibold tracking-normal">设置</h1>
         <p className="text-text-secondary text-sm mt-2">先把状态系统调顺，它会直接影响项目画廊和进展详情。</p>
       </div>
 
       <div className="grid grid-cols-[1fr_360px] gap-6">
-        <section className="glass-panel rounded-[32px] p-6">
+        <section className="glass-panel ambient-panel rounded-[32px] p-6 stagger-item" style={{ '--stagger': 1 } as CSSProperties}>
           <div className="flex items-center justify-between mb-6">
             <div>
               <h2 className="text-xl font-semibold">项目状态</h2>
@@ -105,9 +105,9 @@ export function Settings() {
 
           <div className="space-y-3">
             {statuses.map((status, index) => (
-              <div key={status.id} className="bg-bg-secondary border border-border-subtle rounded-[24px] p-4 grid grid-cols-[minmax(0,1fr)_auto_auto] gap-4 items-center">
+              <div key={status.id} className="motion-card bg-bg-secondary border border-border-subtle rounded-[24px] p-4 grid grid-cols-[minmax(0,1fr)_auto_auto] gap-4 items-center">
                 <div className="flex items-center gap-3">
-                  <span className="w-3 h-3 rounded-full flex-shrink-0" style={{ backgroundColor: status.color }} />
+                  <span className="w-3 h-3 rounded-full flex-shrink-0 breathing-dot" style={{ backgroundColor: status.color }} />
                   <input
                     value={status.name}
                     onChange={e => {
@@ -165,7 +165,7 @@ export function Settings() {
         </section>
 
         <aside className="flex flex-col gap-6">
-          <section className="glass-panel rounded-[32px] p-6">
+          <section className="glass-panel motion-card rounded-[32px] p-6 stagger-item" style={{ '--stagger': 2 } as CSSProperties}>
             <h2 className="text-lg font-semibold mb-4">新增状态</h2>
             <div className="space-y-3">
               <input value={newName} onChange={e => setNewName(e.target.value)} className="w-full bg-bg-secondary border border-border-subtle rounded-2xl px-4 py-3 text-sm outline-none" placeholder="状态名称" />
@@ -184,7 +184,7 @@ export function Settings() {
             </div>
           </section>
 
-          <section className="glass-panel rounded-[32px] p-6 border-accent-orange/30">
+          <section className="glass-panel motion-card rounded-[32px] p-6 border-accent-orange/30 stagger-item" style={{ '--stagger': 3 } as CSSProperties}>
             <div className="flex gap-3">
               <AlertTriangle size={18} className="text-accent-orange flex-shrink-0 mt-0.5" />
               <div>

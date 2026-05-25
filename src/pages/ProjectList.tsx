@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react'
+import { type CSSProperties, useEffect, useMemo, useState } from 'react'
 import { Project, ProjectStatus, Tag } from '../types'
 import { Search, Plus, Image, Sparkles, Folder, X } from 'lucide-react'
 import { useNavigate } from 'react-router-dom'
@@ -73,8 +73,8 @@ export function ProjectList() {
   }
 
   return (
-    <div className="flex flex-col min-h-full w-full py-8 px-10 gap-8">
-      <div className="flex items-end justify-between gap-8">
+    <div className="page-enter flex flex-col min-h-full w-full py-8 px-10 gap-8">
+      <div className="stagger-item flex items-end justify-between gap-8" style={{ '--stagger': 0 } as CSSProperties}>
         <div>
           <p className="text-text-tertiary text-sm mb-2">Project Gallery</p>
           <div className="flex items-center gap-3">
@@ -93,7 +93,7 @@ export function ProjectList() {
       </div>
 
       {isComposerOpen && (
-        <section className="glass-panel rounded-[30px] p-4 animate-[softReveal_220ms_ease-out]">
+        <section className="glass-panel ambient-panel rounded-[30px] p-4 animate-[softReveal_220ms_ease-out]">
           <div className="grid grid-cols-[minmax(220px,1.15fr)_minmax(180px,0.9fr)_170px_auto] gap-3 items-center">
             <div className="relative">
               <Sparkles size={15} className="absolute left-4 top-1/2 -translate-y-1/2 text-accent-blue" />
@@ -147,7 +147,7 @@ export function ProjectList() {
         </section>
       )}
 
-      <div className="glass-panel rounded-[28px] p-3 flex items-center justify-between gap-4">
+      <div className="glass-panel motion-card stagger-item rounded-[28px] p-3 flex items-center justify-between gap-4" style={{ '--stagger': 1 } as CSSProperties}>
         <div className="flex items-center gap-2 overflow-x-auto px-1">
           <button
             onClick={() => setActiveTag(null)}
@@ -161,7 +161,7 @@ export function ProjectList() {
               onClick={() => setActiveTag(tag.id)}
               className={`flex items-center gap-2 px-4 py-2 rounded-full text-sm whitespace-nowrap transition-all duration-[180ms] ${activeTag === tag.id ? 'bg-bg-tertiary text-text-primary' : 'text-text-secondary hover:text-text-primary hover:bg-bg-secondary'}`}
             >
-              <span className="w-2 h-2 rounded-full" style={{ backgroundColor: tag.color }} />
+              <span className="w-2 h-2 rounded-full breathing-dot" style={{ backgroundColor: tag.color }} />
               {tag.name}
             </button>
           ))}
@@ -178,8 +178,8 @@ export function ProjectList() {
       </div>
 
       <div className="grid grid-cols-3 gap-6 pb-10">
-        {filteredProjects.map(project => (
-          <ProjectGalleryCard key={project.id} project={project} onOpen={() => navigate(`/project/${project.id}`)} />
+        {filteredProjects.map((project, index) => (
+          <ProjectGalleryCard key={project.id} project={project} index={index} onOpen={() => navigate(`/project/${project.id}`)} />
         ))}
       </div>
 
@@ -196,14 +196,15 @@ export function ProjectList() {
   )
 }
 
-function ProjectGalleryCard({ project, onOpen }: { project: Project; onOpen: () => void }) {
+function ProjectGalleryCard({ project, onOpen, index }: { project: Project; onOpen: () => void; index: number }) {
   const cover = getProjectCover(project)
   const recentCommit = getRecentCommit(project)
 
   return (
     <button
       onClick={onOpen}
-      className="group text-left glass-panel rounded-[30px] overflow-hidden min-h-[360px] flex flex-col transition-all duration-[220ms] hover:-translate-y-1 hover:bg-bg-tertiary"
+      className="group text-left glass-panel ambient-panel motion-card stagger-item rounded-[30px] overflow-hidden min-h-[360px] flex flex-col transition-all duration-[220ms] hover:-translate-y-1 hover:bg-bg-tertiary"
+      style={{ '--stagger': index + 2 } as CSSProperties}
     >
       {cover ? (
         <div className="h-44 overflow-hidden bg-bg-tertiary">

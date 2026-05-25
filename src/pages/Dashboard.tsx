@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react'
+import { type CSSProperties, useEffect, useMemo, useState } from 'react'
 import { Activity, Clock3, FolderOpen, Plus, Sparkles } from 'lucide-react'
 import { Project, ProjectCommit, ProjectStatus } from '../types'
 import { useNavigate } from 'react-router-dom'
@@ -41,8 +41,8 @@ export function Dashboard() {
   const recentSevenDayCount = displayCommits.filter(commit => Date.now() - commit.createdAt <= 7 * 24 * 60 * 60 * 1000).length
 
   return (
-    <div className="flex flex-col min-h-full w-full py-8 px-10 gap-8">
-      <div className="flex items-end justify-between">
+    <div className="page-enter flex flex-col min-h-full w-full py-8 px-10 gap-8">
+      <div className="stagger-item flex items-end justify-between" style={{ '--stagger': 0 } as CSSProperties}>
         <div>
           <p className="text-text-tertiary text-sm mb-2">Vibe Progress Center</p>
           <div className="flex items-center gap-3">
@@ -58,14 +58,14 @@ export function Dashboard() {
       </div>
 
       <div className="grid grid-cols-4 gap-5">
-        <StatCard icon={<FolderOpen size={18} />} label="项目总数" value={displayProjects.length.toString()} />
-        <StatCard icon={<Sparkles size={18} />} label="进展提交" value={totalCommits.toString()} />
-        <StatCard icon={<Activity size={18} />} label="近 7 日提交" value={recentSevenDayCount.toString()} />
-        <StatCard icon={<Clock3 size={18} />} label="自定义状态" value={displayStatuses.length.toString()} />
+        <StatCard index={1} icon={<FolderOpen size={18} />} label="项目总数" value={displayProjects.length.toString()} />
+        <StatCard index={2} icon={<Sparkles size={18} />} label="进展提交" value={totalCommits.toString()} />
+        <StatCard index={3} icon={<Activity size={18} />} label="近 7 日提交" value={recentSevenDayCount.toString()} />
+        <StatCard index={4} icon={<Clock3 size={18} />} label="自定义状态" value={displayStatuses.length.toString()} />
       </div>
 
-      <div className="grid grid-cols-[1.25fr_0.75fr] gap-6 flex-1 min-h-[420px]">
-        <section className="glass-panel rounded-[30px] p-6 overflow-hidden">
+      <div className="stagger-item grid grid-cols-[1.25fr_0.75fr] gap-6 flex-1 min-h-[420px]" style={{ '--stagger': 5 } as CSSProperties}>
+        <section className="glass-panel ambient-panel rounded-[30px] p-6 overflow-hidden">
           <div className="flex items-center justify-between mb-6">
             <div>
               <h2 className="text-lg font-semibold">最近活跃项目</h2>
@@ -75,7 +75,7 @@ export function Dashboard() {
           </div>
           <div className="grid grid-cols-2 gap-4">
             {displayProjects.slice(0, 6).map(project => (
-              <button key={project.id} onClick={() => navigate(`/project/${project.id}`)} className="group text-left bg-bg-secondary border border-border-subtle rounded-[24px] overflow-hidden min-h-[210px] transition-all duration-[220ms] hover:bg-bg-tertiary hover:-translate-y-0.5">
+              <button key={project.id} onClick={() => navigate(`/project/${project.id}`)} className="motion-card group text-left bg-bg-secondary border border-border-subtle rounded-[24px] overflow-hidden min-h-[210px] transition-all duration-[220ms] hover:bg-bg-tertiary hover:-translate-y-0.5">
                 <div className="h-24 bg-bg-tertiary overflow-hidden">
                   {getProjectCover(project) ? (
                     <SafeImage src={getProjectCover(project)} alt={`${project.name} 封面`} className="w-full h-full object-cover transition-transform duration-300 group-hover:scale-[1.03]" />
@@ -101,11 +101,11 @@ export function Dashboard() {
         </section>
 
         <aside className="flex flex-col gap-6">
-          <section className="glass-panel rounded-[30px] p-6">
+          <section className="glass-panel rounded-[30px] p-6 motion-card">
             <h2 className="text-lg font-semibold mb-4">近期提交流</h2>
             <div className="space-y-4">
               {commits.map(({ project, commit }) => (
-                <button key={commit.id} onClick={() => navigate(`/project/${project.id}`)} className="block w-full text-left border-l border-border-primary pl-4 transition-colors hover:border-accent-blue">
+                <button key={commit.id} onClick={() => navigate(`/project/${project.id}`)} className="block w-full text-left border-l border-border-primary pl-4 transition-all duration-[180ms] hover:border-accent-blue hover:translate-x-0.5">
                   <p className="font-medium text-sm truncate">{commit.title}</p>
                   <p className="text-xs text-text-tertiary mt-1 font-mono">{formatDateTime(commit.createdAt)} · {project.name}</p>
                 </button>
@@ -114,7 +114,7 @@ export function Dashboard() {
             {commits.length === 0 && <EmptyState text="还没有提交。每次 vibecoding 后写一条进展即可。" compact />}
           </section>
 
-          <section className="glass-panel rounded-[30px] p-6">
+          <section className="glass-panel rounded-[30px] p-6 motion-card">
             <h2 className="text-lg font-semibold mb-4">状态分布</h2>
             <div className="space-y-3">
               {displayStatuses.map(status => {
@@ -122,7 +122,7 @@ export function Dashboard() {
                 return (
                   <div key={status.id} className="flex items-center justify-between text-sm">
                     <div className="flex items-center gap-2">
-                      <span className="w-2.5 h-2.5 rounded-full" style={{ backgroundColor: status.color }} />
+                      <span className="w-2.5 h-2.5 rounded-full breathing-dot" style={{ backgroundColor: status.color }} />
                       <span className="text-text-secondary">{status.name}</span>
                     </div>
                     <span className="font-mono text-text-primary">{count}</span>
@@ -132,7 +132,7 @@ export function Dashboard() {
             </div>
           </section>
 
-          <section className="glass-panel rounded-[30px] p-6">
+          <section className="glass-panel rounded-[30px] p-6 motion-card">
             <h2 className="text-lg font-semibold mb-4">整体活跃热力</h2>
             <MiniHeatmap commits={displayCommits} />
           </section>
@@ -142,9 +142,9 @@ export function Dashboard() {
   )
 }
 
-function StatCard({ icon, label, value }: { icon: React.ReactNode; label: string; value: string }) {
+function StatCard({ icon, label, value, index }: { icon: React.ReactNode; label: string; value: string; index: number }) {
   return (
-    <div className="glass-panel rounded-[26px] p-5">
+    <div className="glass-panel motion-card stagger-item rounded-[26px] p-5" style={{ '--stagger': index } as CSSProperties}>
       <div className="flex items-center gap-2 text-text-secondary text-sm mb-4">
         {icon}
         {label}

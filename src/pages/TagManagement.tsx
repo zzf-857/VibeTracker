@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { type CSSProperties, useEffect, useState } from 'react'
 import { Tag, Project } from '../types'
 import { Tags, FolderKanban, Plus, Trash2, Edit2 } from 'lucide-react'
 
@@ -44,16 +44,16 @@ export function TagManagement() {
   }
 
   return (
-    <div className="flex flex-col h-full w-full py-8 px-10 gap-8">
+    <div className="page-enter flex flex-col h-full w-full py-8 px-10 gap-8">
       {/* Header & Controls */}
-      <div className="flex flex-col gap-6">
+      <div className="stagger-item flex flex-col gap-6" style={{ '--stagger': 0 } as CSSProperties}>
         <div>
           <h1 className="text-2xl font-bold tracking-tight mb-1">标签管理</h1>
           <p className="text-text-secondary text-sm">为您的项目分门别类，配置不同色彩的标识符。</p>
         </div>
 
         {/* New Tag Input Area */}
-        <div className="flex items-center gap-4 bg-bg-secondary border border-border-primary p-4 rounded-xl">
+        <div className="glass-panel ambient-panel flex items-center gap-4 p-4 rounded-[28px]">
            <input 
               type="text" 
               value={newTagName}
@@ -86,7 +86,7 @@ export function TagManagement() {
           {tags.map(tag => {
             const linkedProjects = projects.filter(p => p.tags?.some(t => t.id === tag.id))
             return (
-              <div key={tag.id} className="bg-bg-secondary rounded-xl border border-border-primary p-6 flex flex-col gap-5 relative group overflow-hidden transition-colors hover:border-border-subtle hover:bg-bg-tertiary">
+              <div key={tag.id} className="motion-card stagger-item bg-bg-secondary rounded-[24px] border border-border-primary p-6 flex flex-col gap-5 relative group overflow-hidden transition-colors hover:border-border-subtle hover:bg-bg-tertiary" style={{ '--stagger': 1 } as CSSProperties}>
                  {/* Top section */}
                  <div className="flex justify-between items-start">
                     <div className="flex items-center gap-3">

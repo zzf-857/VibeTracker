@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react'
+import { type CSSProperties, useEffect, useMemo, useState } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import { CommitImage, Project, ProjectCommit, ProjectStatus } from '../types'
 import { ArrowLeft, Camera, Folder, ImagePlus, Pencil, Plus, RotateCcw, Save, Star, Trash2, X } from 'lucide-react'
@@ -102,13 +102,13 @@ export function ProjectDetail() {
   if (!project) return <div className="p-10 text-text-secondary">正在读取项目...</div>
 
   return (
-    <div className="flex flex-col min-h-full w-full py-8 px-10 gap-7">
+    <div className="page-enter flex flex-col min-h-full w-full py-8 px-10 gap-7">
       <button onClick={() => navigate(-1)} className="flex items-center gap-2 text-text-tertiary hover:text-text-primary self-start transition-colors">
         <ArrowLeft size={16} /> 返回
       </button>
 
-      <section className="grid grid-cols-[1fr_360px] gap-6">
-        <div className="glass-panel rounded-[32px] p-7 min-h-[260px] flex flex-col justify-between">
+      <section className="stagger-item grid grid-cols-[1fr_360px] gap-6" style={{ '--stagger': 0 } as CSSProperties}>
+        <div className="glass-panel ambient-panel motion-card rounded-[32px] p-7 min-h-[260px] flex flex-col justify-between">
           <div>
             <div className="flex items-start justify-between gap-4">
               <div className="min-w-0 flex-1">
@@ -182,7 +182,7 @@ export function ProjectDetail() {
           </div>
         </div>
 
-        <div className="glass-panel rounded-[32px] overflow-hidden min-h-[260px]">
+        <div className="glass-panel ambient-panel motion-card rounded-[32px] overflow-hidden min-h-[260px]">
           {cover ? (
             <div className="relative h-full min-h-[260px] group">
               <SafeImage src={cover} alt={`${project.name} 封面`} className="w-full h-full object-cover" />
@@ -209,8 +209,8 @@ export function ProjectDetail() {
         </div>
       </section>
 
-      <section className="grid grid-cols-[1.1fr_0.9fr] gap-6 min-h-[520px]">
-        <div className="glass-panel rounded-[32px] p-6 overflow-hidden">
+      <section className="stagger-item grid grid-cols-[1.1fr_0.9fr] gap-6 min-h-[520px]" style={{ '--stagger': 1 } as CSSProperties}>
+        <div className="glass-panel motion-card rounded-[32px] p-6 overflow-hidden">
           <div className="flex items-center justify-between mb-5">
             <div>
               <h2 className="text-xl font-semibold">进展时间线</h2>
@@ -236,10 +236,11 @@ export function ProjectDetail() {
           </div>
 
           <div className="relative pl-7 space-y-5 overflow-y-auto max-h-[540px] pr-2 custom-scrollbar before:absolute before:left-[7px] before:top-2 before:bottom-2 before:w-[2px] before:bg-border-primary">
-            {commits.map(commit => (
+            {commits.map((commit, index) => (
               <CommitCard
                 key={commit.id}
                 commit={commit}
+                index={index}
                 onEdit={() => setEditingCommit(commit)}
                 onDelete={async () => {
                   if (!confirm('删除这条提交？')) return
@@ -256,11 +257,11 @@ export function ProjectDetail() {
         </div>
 
         <aside className="flex flex-col gap-6">
-          <section className="glass-panel rounded-[32px] p-6">
+          <section className="glass-panel motion-card rounded-[32px] p-6">
             <h2 className="text-xl font-semibold mb-5">提交热力图</h2>
             <CommitHeatmap commits={commits} />
           </section>
-          <section className="glass-panel rounded-[32px] p-6">
+          <section className="glass-panel motion-card rounded-[32px] p-6">
             <h2 className="text-xl font-semibold mb-4">最近截图</h2>
             <div className="grid grid-cols-2 gap-3">
               {commits.flatMap(c => c.images || []).slice(0, 4).map(image => (
@@ -290,9 +291,9 @@ export function ProjectDetail() {
   )
 }
 
-function CommitCard({ commit, onEdit, onDelete, onSetCover }: { commit: ProjectCommit; onEdit: () => void; onDelete: () => void; onSetCover: (path: string) => void }) {
+function CommitCard({ commit, index, onEdit, onDelete, onSetCover }: { commit: ProjectCommit; index: number; onEdit: () => void; onDelete: () => void; onSetCover: (path: string) => void }) {
   return (
-    <article className="relative bg-bg-secondary border border-border-subtle rounded-[24px] p-5 transition-all duration-[220ms] hover:bg-bg-tertiary before:absolute before:-left-[31px] before:top-6 before:w-4 before:h-4 before:rounded-full before:bg-status-completed before:border-[4px] before:border-[#111318]">
+    <article className="motion-card stagger-item relative bg-bg-secondary border border-border-subtle rounded-[24px] p-5 transition-all duration-[220ms] hover:bg-bg-tertiary before:absolute before:-left-[31px] before:top-6 before:w-4 before:h-4 before:rounded-full before:bg-status-completed before:border-[4px] before:border-[#111318]" style={{ '--stagger': index } as CSSProperties}>
       <div className="flex items-start justify-between gap-4">
         <div>
           <h3 className="font-semibold text-lg">{commit.title}</h3>
@@ -367,8 +368,8 @@ function CommitEditor({
   }
 
   return (
-    <div className="fixed inset-0 z-50 bg-black/40 backdrop-blur-sm flex justify-end">
-      <aside className="w-[500px] h-full bg-[#111318] border-l border-border-primary p-6 shadow-2xl overflow-y-auto custom-scrollbar">
+    <div className="fixed inset-0 z-50 bg-black/40 backdrop-blur-sm flex justify-end animate-[softReveal_180ms_ease-out]">
+      <aside className="w-[500px] h-full bg-[#111318] border-l border-border-primary p-6 shadow-2xl overflow-y-auto custom-scrollbar animate-[panelSlideIn_240ms_ease-out]">
         <div className="flex items-center justify-between mb-6">
           <h2 className="text-xl font-semibold">编辑提交</h2>
           <button onClick={onClose} className="text-text-tertiary hover:text-text-primary"><X size={18} /></button>
