@@ -1,213 +1,291 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
-import { Project, Todo } from '../types'
-import { ArrowLeft, Clock, Plus, Square, CheckSquare, Trash2, Save, Play, CheckCircle2, PauseCircle } from 'lucide-react'
+import { Project, ProjectCommit, ProjectStatus } from '../types'
+import { ArrowLeft, Camera, ImagePlus, Plus, Save, Trash2, X } from 'lucide-react'
+import { formatDateTime, getActivityLevel, getProjectCover, groupCommitsByDay, toImageSrc } from '../lib/projectView'
 
 export function ProjectDetail() {
   const { id } = useParams<{ id: string }>()
   const navigate = useNavigate()
   const [project, setProject] = useState<Project | null>(null)
-  
-  // Input states
-  const [newNoteContent, setNewNoteContent] = useState('')
-  const [newTodoContent, setNewTodoContent] = useState('')
+  const [statuses, setStatuses] = useState<ProjectStatus[]>([])
+  const [commitTitle, setCommitTitle] = useState('')
+  const [commitDescription, setCommitDescription] = useState('')
+  const [progressDelta, setProgressDelta] = useState('')
+  const [commitImagePath, setCommitImagePath] = useState('')
+  const [editingCommit, setEditingCommit] = useState<ProjectCommit | null>(null)
 
   useEffect(() => {
-    if (id) loadData()
+    loadData()
   }, [id])
 
   const loadData = async () => {
     if (!id) return
-    const p = await window.ipcRenderer.invoke('get-project', id)
+    const [p, s] = await Promise.all([
+      window.ipcRenderer.invoke('get-project', id),
+      window.ipcRenderer.invoke('get-statuses'),
+    ])
     setProject(p)
+    setStatuses(s)
   }
 
-  // Updates
-  const updateStatus = async (status: 'developing' | 'completed' | 'paused') => {
+  const commits = project?.commits || []
+  const cover = project ? getProjectCover(project) : ''
+
+  const createCommit = async () => {
+    if (!project || !commitTitle.trim()) return
+    await window.ipcRenderer.invoke('create-commit', {
+      projectId: project.id,
+      title: commitTitle.trim(),
+      description: commitDescription.trim(),
+      progressDelta: Number(progressDelta) || 0,
+      imagePath: commitImagePath.trim(),
+    })
+    setCommitTitle('')
+    setCommitDescription('')
+    setProgressDelta('')
+    setCommitImagePath('')
+    loadData()
+  }
+
+  const selectCommitImage = async () => {
+    const path = await window.ipcRenderer.invoke('select-image')
+    if (path) setCommitImagePath(path)
+  }
+
+  const updateStatus = async (statusId: string) => {
     if (!project) return
-    await window.ipcRenderer.invoke('update-project', project.id, { status })
+    await window.ipcRenderer.invoke('update-project', project.id, { status: statusId })
     loadData()
   }
 
-  const updateProgress = async (val: number) => {
+  const setCoverFromPath = async (imagePath: string) => {
     if (!project) return
-    await window.ipcRenderer.invoke('update-project', project.id, { progress: Math.max(0, Math.min(100, val)) })
+    await window.ipcRenderer.invoke('update-project', project.id, { coverImagePath: imagePath })
     loadData()
   }
 
-  // Noteblocks
-  const handleAddNote = async () => {
-    if (!project || !newNoteContent.trim()) return
-    await window.ipcRenderer.invoke('create-noteblock', project.id, newNoteContent)
-    setNewNoteContent('')
-    loadData()
+  if (!project) return <div className="p-10 text-text-secondary">正在读取项目...</div>
+
+  return (
+    <div className="flex flex-col min-h-full w-full py-8 px-10 gap-7">
+      <button onClick={() => navigate(-1)} className="flex items-center gap-2 text-text-tertiary hover:text-text-primary self-start transition-colors">
+        <ArrowLeft size={16} /> 返回
+      </button>
+
+      <section className="grid grid-cols-[1fr_360px] gap-6">
+        <div className="glass-panel rounded-[32px] p-7 min-h-[260px] flex flex-col justify-between">
+          <div>
+            <div className="flex items-start justify-between gap-4">
+              <div>
+                <p className="text-text-tertiary text-sm mb-2">Project Dossier</p>
+                <h1 className="text-[38px] font-semibold tracking-normal">{project.name}</h1>
+              </div>
+              <select
+                value={project.status}
+                onChange={e => updateStatus(e.target.value)}
+                className="bg-bg-tertiary border border-border-subtle rounded-full px-4 py-2 text-sm outline-none"
+                style={{ color: project.statusInfo?.color || undefined }}
+              >
+                {statuses.map(status => <option key={status.id} value={status.id}>{status.name}</option>)}
+              </select>
+            </div>
+            <p className="text-text-secondary leading-7 mt-5 max-w-3xl">{project.description || '这个项目还没有简介。可以在之后的编辑面板里补充它的故事。'}</p>
+          </div>
+          <div className="flex items-center gap-3 flex-wrap mt-6">
+            <span className="px-3 py-1.5 rounded-full bg-bg-tertiary border border-border-subtle text-sm text-text-secondary">{commits.length} 次提交</span>
+            <span className="px-3 py-1.5 rounded-full bg-bg-tertiary border border-border-subtle text-sm text-text-secondary font-mono">updated {formatDateTime(project.updatedAt)}</span>
+            {project.path && <span className="px-3 py-1.5 rounded-full bg-bg-tertiary border border-border-subtle text-sm text-text-tertiary font-mono truncate max-w-[420px]">{project.path}</span>}
+          </div>
+        </div>
+
+        <div className="glass-panel rounded-[32px] overflow-hidden min-h-[260px]">
+          {cover ? (
+            <div className="relative h-full min-h-[260px] group">
+              <img src={toImageSrc(cover)} className="w-full h-full object-cover" />
+              <div className="absolute inset-x-0 bottom-0 p-4 bg-gradient-to-t from-black/60 to-transparent">
+                <button onClick={() => setCoverFromPath('')} className="text-xs text-white/80 hover:text-white">清除手动封面</button>
+              </div>
+            </div>
+          ) : (
+            <div className="h-full min-h-[260px] p-6 flex flex-col justify-end text-text-tertiary bg-bg-tertiary/40">
+              <Camera size={34} className="mb-4 opacity-70" />
+              <p className="text-sm">添加带截图的 commit 后，这里会自动显示项目封面。</p>
+            </div>
+          )}
+        </div>
+      </section>
+
+      <section className="grid grid-cols-[1.1fr_0.9fr] gap-6 min-h-[520px]">
+        <div className="glass-panel rounded-[32px] p-6 overflow-hidden">
+          <div className="flex items-center justify-between mb-5">
+            <div>
+              <h2 className="text-xl font-semibold">进展时间线</h2>
+              <p className="text-sm text-text-tertiary mt-1">每次 vibecoding 后写一条 commit。</p>
+            </div>
+          </div>
+
+          <div className="bg-bg-secondary border border-border-subtle rounded-[26px] p-4 mb-6">
+            <div className="grid grid-cols-[1fr_120px] gap-3 mb-3">
+              <input value={commitTitle} onChange={e => setCommitTitle(e.target.value)} className="bg-bg-tertiary border border-border-subtle rounded-2xl px-4 py-2.5 text-sm outline-none focus:border-border-primary" placeholder="提交标题，例如：完成项目详情页定调" />
+              <input value={progressDelta} onChange={e => setProgressDelta(e.target.value)} className="bg-bg-tertiary border border-border-subtle rounded-2xl px-4 py-2.5 text-sm outline-none focus:border-border-primary font-mono" placeholder="+0" />
+            </div>
+            <textarea value={commitDescription} onChange={e => setCommitDescription(e.target.value)} className="w-full bg-bg-tertiary border border-border-subtle rounded-2xl px-4 py-3 text-sm outline-none focus:border-border-primary resize-none h-20" placeholder="描述这次推进了什么、为什么重要..." />
+            <div className="flex items-center gap-2 mt-3">
+              <button onClick={selectCommitImage} className="px-4 py-2 rounded-full bg-bg-tertiary border border-border-subtle text-sm text-text-secondary hover:text-text-primary flex items-center gap-2 transition-colors">
+                <ImagePlus size={15} /> 选择截图
+              </button>
+              {commitImagePath && <span className="text-xs text-text-tertiary truncate flex-1 font-mono">{commitImagePath}</span>}
+              <button onClick={createCommit} className="ml-auto bg-text-primary text-primary rounded-full px-4 py-2 text-sm font-semibold flex items-center gap-2 transition-opacity hover:opacity-90">
+                <Plus size={15} /> 提交
+              </button>
+            </div>
+          </div>
+
+          <div className="relative pl-7 space-y-5 overflow-y-auto max-h-[540px] pr-2 custom-scrollbar before:absolute before:left-[7px] before:top-2 before:bottom-2 before:w-[2px] before:bg-border-primary">
+            {commits.map(commit => (
+              <CommitCard
+                key={commit.id}
+                commit={commit}
+                onEdit={() => setEditingCommit(commit)}
+                onDelete={async () => {
+                  if (!confirm('删除这条提交？')) return
+                  await window.ipcRenderer.invoke('delete-commit', commit.id)
+                  loadData()
+                }}
+                onSetCover={(imagePath) => setCoverFromPath(imagePath)}
+              />
+            ))}
+            {commits.length === 0 && (
+              <div className="min-h-[220px] flex items-center justify-center text-text-tertiary text-sm">还没有提交，先写下第一条进展。</div>
+            )}
+          </div>
+        </div>
+
+        <aside className="flex flex-col gap-6">
+          <section className="glass-panel rounded-[32px] p-6">
+            <h2 className="text-xl font-semibold mb-5">提交热力图</h2>
+            <CommitHeatmap commits={commits} />
+          </section>
+          <section className="glass-panel rounded-[32px] p-6">
+            <h2 className="text-xl font-semibold mb-4">最近截图</h2>
+            <div className="grid grid-cols-2 gap-3">
+              {commits.flatMap(c => c.images || []).slice(0, 4).map(image => (
+                <button key={image.id} onClick={() => setCoverFromPath(image.imagePath)} className="aspect-video rounded-2xl overflow-hidden bg-bg-tertiary border border-border-subtle">
+                  <img src={toImageSrc(image.imagePath)} className="w-full h-full object-cover" />
+                </button>
+              ))}
+            </div>
+            {commits.flatMap(c => c.images || []).length === 0 && <p className="text-sm text-text-tertiary">还没有提交截图。</p>}
+          </section>
+        </aside>
+      </section>
+
+      {editingCommit && (
+        <CommitEditor
+          commit={editingCommit}
+          onClose={() => setEditingCommit(null)}
+          onSaved={() => {
+            setEditingCommit(null)
+            loadData()
+          }}
+        />
+      )}
+    </div>
+  )
+}
+
+function CommitCard({ commit, onEdit, onDelete, onSetCover }: { commit: ProjectCommit; onEdit: () => void; onDelete: () => void; onSetCover: (path: string) => void }) {
+  return (
+    <article className="relative bg-bg-secondary border border-border-subtle rounded-[24px] p-5 transition-all duration-[220ms] hover:bg-bg-tertiary before:absolute before:-left-[31px] before:top-6 before:w-4 before:h-4 before:rounded-full before:bg-status-completed before:border-[4px] before:border-[#111318]">
+      <div className="flex items-start justify-between gap-4">
+        <div>
+          <h3 className="font-semibold text-lg">{commit.title}</h3>
+          <p className="text-sm text-text-secondary mt-2 leading-6 whitespace-pre-wrap">{commit.description || '没有补充描述。'}</p>
+        </div>
+        <div className="flex gap-1">
+          <button onClick={onEdit} className="text-text-tertiary hover:text-text-primary p-2 transition-colors"><Save size={15} /></button>
+          <button onClick={onDelete} className="text-text-tertiary hover:text-accent-red p-2 transition-colors"><Trash2 size={15} /></button>
+        </div>
+      </div>
+      <div className="flex items-center gap-3 mt-4 text-xs text-text-tertiary font-mono">
+        <span>{formatDateTime(commit.createdAt)}</span>
+        {commit.progressDelta !== 0 && <span>{commit.progressDelta > 0 ? '+' : ''}{commit.progressDelta}%</span>}
+      </div>
+      {(commit.images || []).length > 0 && (
+        <div className="grid grid-cols-3 gap-3 mt-4">
+          {commit.images?.map(image => (
+            <button key={image.id} onClick={() => onSetCover(image.imagePath)} className="aspect-video rounded-2xl overflow-hidden bg-bg-tertiary border border-border-subtle group">
+              <img src={toImageSrc(image.imagePath)} className="w-full h-full object-cover transition-transform duration-300 group-hover:scale-[1.03]" />
+            </button>
+          ))}
+        </div>
+      )}
+    </article>
+  )
+}
+
+function CommitEditor({ commit, onClose, onSaved }: { commit: ProjectCommit; onClose: () => void; onSaved: () => void }) {
+  const [title, setTitle] = useState(commit.title)
+  const [description, setDescription] = useState(commit.description)
+  const [progressDelta, setProgressDelta] = useState(String(commit.progressDelta || ''))
+
+  const save = async () => {
+    await window.ipcRenderer.invoke('update-commit', commit.id, {
+      title,
+      description,
+      progressDelta: Number(progressDelta) || 0,
+    })
+    onSaved()
   }
 
-  const handleDeleteNote = async (nid: string) => {
-    if (!confirm('删除此备注？')) return
-    await window.ipcRenderer.invoke('delete-noteblock', nid)
-    loadData()
-  }
-
-  // Todos
-  const handleAddTodo = async (e: React.KeyboardEvent<HTMLInputElement>) => {
-    if (e.key === 'Enter' && project && newTodoContent.trim()) {
-      await window.ipcRenderer.invoke('create-todo', project.id, newTodoContent)
-      setNewTodoContent('')
-      loadData()
+  const addImage = async () => {
+    const path = await window.ipcRenderer.invoke('select-image')
+    if (path) {
+      await window.ipcRenderer.invoke('add-commit-image', commit.id, path)
+      onSaved()
     }
   }
 
-  const handleToggleTodo = async (todo: Todo) => {
-    await window.ipcRenderer.invoke('update-todo', todo.id, { completed: todo.completed ? 0 : 1 })
-    loadData()
-  }
+  return (
+    <div className="fixed inset-0 z-50 bg-black/40 backdrop-blur-sm flex justify-end">
+      <aside className="w-[460px] h-full bg-[#111318] border-l border-border-primary p-6 shadow-2xl">
+        <div className="flex items-center justify-between mb-6">
+          <h2 className="text-xl font-semibold">编辑提交</h2>
+          <button onClick={onClose} className="text-text-tertiary hover:text-text-primary"><X size={18} /></button>
+        </div>
+        <div className="space-y-4">
+          <input value={title} onChange={e => setTitle(e.target.value)} className="w-full bg-bg-secondary border border-border-subtle rounded-2xl px-4 py-3 text-sm outline-none" />
+          <textarea value={description} onChange={e => setDescription(e.target.value)} className="w-full bg-bg-secondary border border-border-subtle rounded-2xl px-4 py-3 text-sm outline-none h-40 resize-none" />
+          <input value={progressDelta} onChange={e => setProgressDelta(e.target.value)} className="w-full bg-bg-secondary border border-border-subtle rounded-2xl px-4 py-3 text-sm outline-none font-mono" placeholder="进度变化" />
+          <button onClick={addImage} className="w-full bg-bg-secondary border border-border-subtle rounded-full px-4 py-3 text-sm text-text-secondary hover:text-text-primary flex items-center justify-center gap-2">
+            <ImagePlus size={15} /> 添加截图路径
+          </button>
+          <button onClick={save} className="w-full bg-text-primary text-primary rounded-full px-4 py-3 text-sm font-semibold">保存修改</button>
+        </div>
+      </aside>
+    </div>
+  )
+}
 
-  const handleDeleteTodo = async (tid: string) => {
-    await window.ipcRenderer.invoke('delete-todo', tid)
-    loadData()
-  }
-
-  if (!project) return <div className="p-10 text-text-secondary">检索项目信息中...</div>
+function CommitHeatmap({ commits }: { commits: ProjectCommit[] }) {
+  const counts = useMemo(() => groupCommitsByDay(commits), [commits])
+  const days = useMemo(() => {
+    return Array.from({ length: 70 }).map((_, index) => {
+      const date = new Date()
+      date.setDate(date.getDate() - (69 - index))
+      const key = date.toISOString().slice(0, 10)
+      const count = counts.get(key) || 0
+      return { key, count, level: getActivityLevel(count) }
+    })
+  }, [counts])
 
   return (
-    <div className="flex flex-col h-full w-full py-8 px-10 gap-8">
-      {/* Header */}
-      <div className="flex flex-col gap-4">
-        <button onClick={() => navigate(-1)} className="flex items-center gap-2 text-text-tertiary hover:text-text-primary self-start transition-colors">
-          <ArrowLeft size={16} /> 返回列表
-        </button>
-
-        <div className="flex items-start justify-between">
-           <div>
-              <div className="flex items-center gap-3 mb-2">
-                 <h1 className="text-3xl font-bold tracking-tight text-text-primary">{project.name}</h1>
-                 <span className={`text-xs px-2.5 py-1 rounded-[4px] font-medium border flex items-center gap-1.5
-                    ${project.status === 'developing' ? 'bg-accent-blue/10 text-accent-blue border-accent-blue/20' : ''}
-                    ${project.status === 'completed' ? 'bg-status-completed/10 text-status-completed border-status-completed/20' : ''}
-                    ${project.status === 'paused' ? 'bg-status-paused/10 text-status-paused border-status-paused/20' : ''}
-                 `}>
-                    {project.status === 'developing' && <Play size={12}/>}
-                    {project.status === 'completed' && <CheckCircle2 size={12}/>}
-                    {project.status === 'paused' && <PauseCircle size={12}/>}
-                    {project.status === 'developing' ? '开发中' : project.status === 'completed' ? '已完成' : '已暂停'}
-                 </span>
-              </div>
-              <p className="text-text-secondary text-sm font-mono bg-bg-secondary inline-block px-2 py-1 rounded-md border border-border-primary">
-                 {project.path || '未配置本地路径'}
-              </p>
-           </div>
-
-           <div className="flex gap-2">
-              <button onClick={() => updateStatus('developing')} className="bg-bg-secondary hover:bg-bg-tertiary border border-border-primary text-text-secondary hover:text-accent-blue px-3 py-1.5 rounded-lg transition-colors flex items-center gap-2 text-sm font-medium">
-                 <Play size={14}/> 设为开发中
-              </button>
-              <button onClick={() => updateStatus('completed')} className="bg-bg-secondary hover:bg-bg-tertiary border border-border-primary text-text-secondary hover:text-status-completed px-3 py-1.5 rounded-lg transition-colors flex items-center gap-2 text-sm font-medium">
-                 <CheckCircle2 size={14}/> 设为已完成
-              </button>
-              <button onClick={() => updateStatus('paused')} className="bg-bg-secondary hover:bg-bg-tertiary border border-border-primary text-text-secondary hover:text-status-paused px-3 py-1.5 rounded-lg transition-colors flex items-center gap-2 text-sm font-medium">
-                 <PauseCircle size={14}/> 设为已暂停
-              </button>
-           </div>
-        </div>
-
-        {/* Progress Control */}
-        <div className="bg-bg-secondary p-4 rounded-xl border border-border-primary flex items-center gap-4 mt-2">
-           <span className="text-sm font-medium text-text-secondary w-20">整体进度</span>
-           <input 
-              type="range" 
-              min="0" max="100" 
-              value={project.progress || 0} 
-              onChange={e => updateProgress(Number(e.target.value))}
-              className="flex-1 h-2 bg-bg-primary rounded-lg appearance-none cursor-pointer accent-accent-blue"
-           />
-           <span className="text-sm font-mono font-bold text-text-primary w-12 text-right">{Math.round(project.progress || 0)}%</span>
-        </div>
-      </div>
-
-      {/* Dual Column Content */}
-      <div className="flex-1 grid grid-cols-[1fr_350px] gap-8 overflow-hidden">
-         {/* Left: Notes Blocks */}
-         <div className="flex flex-col gap-4 overflow-hidden h-full">
-            <div className="flex items-center justify-between">
-               <h2 className="text-lg font-bold">项目备注 (Notes)</h2>
-            </div>
-            
-            {/* New Note Input Area */}
-            <div className="bg-bg-secondary border border-border-primary rounded-xl p-4 flex flex-col gap-3">
-               <textarea 
-                  value={newNoteContent}
-                  onChange={e => setNewNoteContent(e.target.value)}
-                  placeholder="在此写入新的备注内容或突发灵感..."
-                  className="w-full bg-transparent resize-none outline-none text-text-primary text-sm h-20 placeholder-text-tertiary custom-scrollbar"
-               ></textarea>
-               <div className="flex justify-end">
-                  <button onClick={handleAddNote} className="bg-bg-tertiary hover:bg-border-subtle hover:text-white border border-border-primary text-text-secondary px-4 py-1.5 rounded-lg text-sm font-medium transition-colors flex items-center gap-1.5">
-                     <Save size={14} /> 保存新的 Block
-                  </button>
-               </div>
-            </div>
-
-            {/* Note Blocks List */}
-            <div className="flex-1 overflow-y-auto pr-2 flex flex-col gap-4 pb-10 custom-scrollbar">
-               {project.noteblocks?.map(note => (
-                 <div key={note.id} className="bg-bg-secondary border border-border-primary rounded-xl p-5 flex flex-col gap-4 group hover:border-border-subtle transition-colors">
-                    <p className="text-text-primary text-sm whitespace-pre-wrap leading-relaxed">
-                       {note.content}
-                    </p>
-                    <div className="flex items-center justify-between pt-3 border-t border-border-primary/50">
-                       <div className="flex items-center gap-1.5 text-xs text-text-tertiary font-mono">
-                          <Clock size={12} />
-                          最后修改: {new Date(note.updatedAt).toLocaleString()}
-                       </div>
-                       <button onClick={() => handleDeleteNote(note.id)} className="text-text-tertiary hover:text-accent-red opacity-0 group-hover:opacity-100 transition-opacity p-1">
-                          <Trash2 size={14} />
-                       </button>
-                    </div>
-                 </div>
-               ))}
-               {(!project.noteblocks || project.noteblocks.length === 0) && (
-                 <div className="text-center text-sm text-text-tertiary mt-10">暂无项目备注</div>
-               )}
-            </div>
-         </div>
-
-         {/* Right: Todos */}
-         <div className="flex flex-col gap-4 bg-sidebar border border-border-primary rounded-xl p-6 overflow-hidden h-full">
-            <h2 className="text-lg font-bold mb-2">代办清单 (To-do)</h2>
-            
-            <div className="relative group">
-              <Plus size={16} className="absolute left-3 top-2.5 text-text-tertiary" />
-              <input 
-                 type="text" 
-                 value={newTodoContent}
-                 onChange={e => setNewTodoContent(e.target.value)}
-                 onKeyDown={handleAddTodo}
-                 placeholder="输入待办事项，按回车添加..."
-                 className="w-full bg-bg-primary border border-border-subtle rounded-lg pl-9 p-2 text-sm text-text-primary outline-none focus:border-border-primary transition-colors"
-              />
-            </div>
-
-            <div className="flex-1 overflow-y-auto pr-2 custom-scrollbar mt-2 flex flex-col gap-2">
-               {project.todos?.map(todo => (
-                 <div key={todo.id} className="flex items-start gap-3 group p-2 rounded-lg hover:bg-bg-tertiary transition-colors">
-                    <button onClick={() => handleToggleTodo(todo)} className="mt-0.5 text-text-tertiary hover:text-accent-blue transition-colors flex-shrink-0">
-                       {todo.completed ? <CheckSquare size={16} className="text-status-completed" /> : <Square size={16} />}
-                    </button>
-                    <span className={`text-sm flex-1 break-words ${todo.completed ? 'text-text-tertiary line-through' : 'text-text-primary'}`}>
-                       {todo.content}
-                    </span>
-                    <button onClick={() => handleDeleteTodo(todo.id)} className="text-text-tertiary hover:text-accent-red opacity-0 group-hover:opacity-100 transition-opacity p-1 flex-shrink-0">
-                       <Trash2 size={14}/>
-                    </button>
-                 </div>
-               ))}
-               {(!project.todos || project.todos.length === 0) && (
-                 <div className="text-center text-sm text-text-tertiary mt-10">没遗留任务，尽情放松吧</div>
-               )}
-            </div>
-         </div>
-      </div>
+    <div className="grid grid-cols-[repeat(14,minmax(0,1fr))] gap-1">
+      {days.map(day => {
+        const className = ['bg-bg-tertiary', 'bg-status-completed/25', 'bg-status-completed/45', 'bg-status-completed/70', 'bg-status-completed'][day.level]
+        return <span key={day.key} title={`${day.key}: ${day.count} 次提交`} className={`aspect-square rounded-[5px] ${className}`} />
+      })}
     </div>
   )
 }

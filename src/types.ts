@@ -5,6 +5,36 @@ export interface Tag {
   createdAt: number
 }
 
+export interface ProjectStatus {
+  id: string
+  name: string
+  color: string
+  sortIndex: number
+  createdAt: number
+  updatedAt: number
+  projectCount?: number
+}
+
+export interface CommitImage {
+  id: string
+  commitId: string
+  imagePath: string
+  caption: string
+  sortIndex: number
+  createdAt: number
+}
+
+export interface ProjectCommit {
+  id: string
+  projectId: string
+  title: string
+  description: string
+  progressDelta: number
+  createdAt: number
+  updatedAt: number
+  images?: CommitImage[]
+}
+
 export interface NoteBlock {
   id: string
   projectId: string
@@ -27,13 +57,19 @@ export interface Project {
   name: string
   description: string
   path: string
-  status: 'developing' | 'completed' | 'paused'
+  status: string
+  statusInfo?: ProjectStatus
   progress: number
+  coverImagePath: string
+  resolvedCoverImagePath?: string
+  recentCommit?: ProjectCommit
+  commitCount?: number
   createdAt: number
   updatedAt: number
   tags?: Tag[]
   noteblocks?: NoteBlock[]
   todos?: Todo[]
+  commits?: ProjectCommit[]
 }
 
 export interface IpcRenderer {
@@ -42,6 +78,20 @@ export interface IpcRenderer {
   invoke(channel: 'create-project', data: Partial<Project> & { tagIds?: string[] }): Promise<string>
   invoke(channel: 'update-project', id: string, data: Partial<Project> & { tagIds?: string[] }): Promise<boolean>
   invoke(channel: 'delete-project', id: string): Promise<boolean>
+
+  invoke(channel: 'get-statuses'): Promise<ProjectStatus[]>
+  invoke(channel: 'create-status', data: { name: string; color: string }): Promise<string>
+  invoke(channel: 'update-status', id: string, data: Partial<Pick<ProjectStatus, 'name' | 'color' | 'sortIndex'>>): Promise<boolean>
+  invoke(channel: 'delete-status', id: string): Promise<{ ok: boolean; reason?: string }>
+  invoke(channel: 'reorder-statuses', orderedIds: string[]): Promise<boolean>
+  invoke(channel: 'select-image'): Promise<string | null>
+
+  invoke(channel: 'get-commits', projectId: string): Promise<ProjectCommit[]>
+  invoke(channel: 'create-commit', data: { projectId: string; title: string; description?: string; progressDelta?: number; imagePath?: string }): Promise<string>
+  invoke(channel: 'update-commit', id: string, data: Partial<Pick<ProjectCommit, 'title' | 'description' | 'progressDelta'>>): Promise<boolean>
+  invoke(channel: 'delete-commit', id: string): Promise<boolean>
+  invoke(channel: 'add-commit-image', commitId: string, imagePath: string, caption?: string): Promise<string>
+  invoke(channel: 'delete-commit-image', id: string): Promise<boolean>
   
   invoke(channel: 'get-tags'): Promise<Tag[]>
   invoke(channel: 'create-tag', data: { name: string; color: string }): Promise<string>
