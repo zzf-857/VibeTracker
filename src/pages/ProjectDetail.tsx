@@ -38,7 +38,7 @@ export function ProjectDetail() {
       window.ipcRenderer.invoke('get-project', id),
       window.ipcRenderer.invoke('get-statuses'),
     ])
-    const mockProject = !p && isMockProjectId(id) ? getMockProject(id) : null
+    const mockProject = (!p || Array.isArray(p)) && isMockProjectId(id) ? getMockProject(id) : null
     setProject(mockProject || p)
     setStatuses(mockProject ? mockStatuses : s)
   }
