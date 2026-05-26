@@ -38,6 +38,20 @@
   
   --status-completed: #63D693;
   --status-paused: #F3BB6C;
+
+  --motion-instant: 80ms;
+  --motion-fast: 120ms;
+  --motion-base: 180ms;
+  --motion-panel: 280ms;
+  --motion-page: 340ms;
+  --motion-ritual: 980ms;
+
+  --ease-standard: cubic-bezier(0.2, 0, 0, 1);
+  --ease-emphasized: cubic-bezier(0.16, 1, 0.3, 1);
+  --ease-press: cubic-bezier(0.3, 0, 0.2, 1);
+
+  --lift-card: -4px;
+  --press-scale: 0.98;
 }
 
 body {
@@ -93,26 +107,48 @@ body {
 }
 
 .soft-motion {
-  transition-duration: 180ms;
-  transition-timing-function: ease-out;
+  transition-duration: var(--motion-base);
+  transition-timing-function: var(--ease-standard);
 }
 
 .page-enter {
-  animation: pageEnter 260ms ease-out both;
+  animation: pageEnter var(--motion-page) var(--ease-emphasized) both;
 }
 
 .motion-card {
   transition:
-    transform 180ms ease-out,
-    border-color 180ms ease-out,
-    background-color 180ms ease-out,
-    box-shadow 180ms ease-out,
-    opacity 180ms ease-out;
+    transform var(--motion-base) var(--ease-standard),
+    border-color var(--motion-base) var(--ease-standard),
+    background-color var(--motion-base) var(--ease-standard),
+    box-shadow var(--motion-base) var(--ease-standard),
+    opacity var(--motion-base) var(--ease-standard);
   will-change: transform;
 }
 
 .motion-card:hover {
   box-shadow: 0 34px 90px rgba(0, 0, 0, 0.34);
+}
+
+.motion-press {
+  transition-property: transform, opacity;
+  transition-duration: var(--motion-fast);
+  transition-timing-function: var(--ease-press);
+}
+
+.motion-press:active {
+  transform: scale(var(--press-scale));
+}
+
+.motion-focus {
+  transition-property: transform, opacity, border-color, box-shadow;
+  transition-duration: var(--motion-fast), var(--motion-fast), var(--motion-base), var(--motion-base);
+  transition-timing-function: var(--ease-press), var(--ease-standard), var(--ease-standard), var(--ease-standard);
+}
+
+.motion-focus:focus {
+  outline: none;
+  border-color: rgba(116, 169, 255, 0.5);
+  box-shadow: 0 0 0 3px rgba(116, 169, 255, 0.16);
 }
 
 .ambient-panel::after {
@@ -131,8 +167,48 @@ body {
 }
 
 .stagger-item {
-  animation: itemRise 320ms ease-out both;
+  animation: itemRise var(--motion-panel) var(--ease-emphasized) both;
   animation-delay: calc(var(--stagger, 0) * 55ms);
+}
+
+.ritual-confirm {
+  animation: ritualConfirm var(--motion-ritual) var(--ease-emphasized) both;
+}
+
+.ritual-timeline {
+  animation: ritualTimeline var(--motion-ritual) var(--ease-standard) both;
+}
+
+.ritual-sync {
+  animation: ritualSync var(--motion-ritual) var(--ease-emphasized) both;
+}
+
+.ritual-settle {
+  animation: ritualSettle var(--motion-panel) var(--ease-standard) both;
+}
+
+.motion-update {
+  animation: updateGlow var(--motion-panel) var(--ease-emphasized) both;
+}
+
+.heatmap-pulse {
+  animation: heatmapPulse var(--motion-ritual) var(--ease-emphasized) both;
+}
+
+.cover-sheen {
+  position: relative;
+  overflow: hidden;
+}
+
+.cover-sheen::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background: linear-gradient(105deg, transparent 16%, rgba(255, 255, 255, 0.14) 48%, transparent 76%);
+  transform: translateX(-120%);
+  opacity: 0;
+  animation: coverSheen var(--motion-ritual) var(--ease-emphasized) both;
 }
 
 @keyframes softReveal {
@@ -165,6 +241,95 @@ body {
   to {
     opacity: 1;
     transform: translateY(0) scale(1);
+  }
+}
+
+@keyframes ritualConfirm {
+  0% {
+    opacity: 0;
+    transform: translateY(6px) scale(0.985);
+  }
+  38% {
+    opacity: 1;
+    transform: translateY(0) scale(1.006);
+  }
+  100% {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+@keyframes ritualTimeline {
+  0% {
+    opacity: 0;
+    transform: translateX(-8px);
+  }
+  46% {
+    opacity: 1;
+    transform: translateX(1px);
+  }
+  100% {
+    opacity: 1;
+    transform: translateX(0);
+  }
+}
+
+@keyframes ritualSync {
+  0%, 100% {
+    filter: brightness(1);
+    transform: scale(1);
+  }
+  42% {
+    filter: brightness(1.14);
+    transform: scale(1.012);
+  }
+}
+
+@keyframes ritualSettle {
+  from {
+    opacity: 0.84;
+    transform: translateY(-3px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes updateGlow {
+  0% {
+    box-shadow: 0 0 0 rgba(116, 169, 255, 0);
+  }
+  46% {
+    box-shadow: 0 0 0 4px rgba(116, 169, 255, 0.12);
+  }
+  100% {
+    box-shadow: 0 0 0 rgba(116, 169, 255, 0);
+  }
+}
+
+@keyframes heatmapPulse {
+  0%, 100% {
+    box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.04);
+    transform: scale(1);
+  }
+  44% {
+    box-shadow: inset 0 0 0 1px rgba(99, 214, 147, 0.24), 0 0 18px rgba(99, 214, 147, 0.12);
+    transform: scale(1.035);
+  }
+}
+
+@keyframes coverSheen {
+  0% {
+    opacity: 0;
+    transform: translateX(-120%);
+  }
+  28% {
+    opacity: 0.46;
+  }
+  100% {
+    opacity: 0;
+    transform: translateX(120%);
   }
 }
 
@@ -242,7 +407,14 @@ body {
   }
 
   #root::before,
-  .ambient-panel::after {
+  .ambient-panel::after,
+  .ritual-confirm,
+  .ritual-timeline,
+  .ritual-sync,
+  .ritual-settle,
+  .motion-update,
+  .heatmap-pulse,
+  .cover-sheen::after {
     animation: none !important;
   }
 }
