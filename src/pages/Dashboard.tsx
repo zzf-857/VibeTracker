@@ -1,4 +1,4 @@
-import { type CSSProperties, useEffect, useMemo, useState } from 'react'
+import { type CSSProperties, useEffect, useMemo, useRef, useState } from 'react'
 import { Activity, Clock3, FolderOpen, Plus, Sparkles } from 'lucide-react'
 import { Project, ProjectCommit, ProjectStatus } from '../types'
 import { useNavigate } from 'react-router-dom'
@@ -76,10 +76,10 @@ export function Dashboard() {
           </div>
           <div className="grid grid-cols-2 gap-4">
             {displayProjects.slice(0, 6).map(project => (
-              <button key={project.id} onClick={() => navigate(`/project/${project.id}`)} className="motion-card group text-left bg-bg-secondary border border-border-subtle rounded-[24px] overflow-hidden min-h-[210px] transition-all duration-[220ms] hover:bg-bg-tertiary hover:-translate-y-0.5">
+              <button key={project.id} onClick={() => navigate(`/project/${project.id}`)} className="dashboard-project-card motion-card group text-left bg-bg-secondary border border-border-subtle rounded-[24px] overflow-hidden min-h-[210px]">
                 <div className="h-24 bg-bg-tertiary overflow-hidden">
                   {getProjectCover(project) ? (
-                    <SafeImage src={getProjectCover(project)} alt={`${project.name} 封面`} className="w-full h-full object-cover transition-transform duration-300 group-hover:scale-[1.03]" />
+                    <SafeImage src={getProjectCover(project)} alt={`${project.name} 封面`} className="w-full h-full object-cover gallery-cover" />
                   ) : (
                     <div className="h-full flex items-end p-4 text-text-tertiary text-sm">文字项目卡片</div>
                   )}
@@ -105,8 +105,8 @@ export function Dashboard() {
           <section className="glass-panel rounded-[30px] p-6 motion-card">
             <h2 className="text-lg font-semibold mb-4">近期提交流</h2>
             <div className="space-y-4">
-              {commits.map(({ project, commit }) => (
-                <button key={commit.id} onClick={() => navigate(`/project/${project.id}`)} className="block w-full text-left border-l border-border-primary pl-4 transition-all duration-[180ms] hover:border-accent-blue hover:translate-x-0.5">
+              {commits.map(({ project, commit }, index) => (
+                <button key={commit.id} onClick={() => navigate(`/project/${project.id}`)} className="recent-stream-item block w-full text-left border-l border-border-primary pl-4 transition-all duration-[180ms] hover:border-accent-blue hover:translate-x-0.5" style={{ '--stagger': index } as CSSProperties}>
                   <p className="font-medium text-sm truncate">{commit.title}</p>
                   <p className="text-xs text-text-tertiary mt-1 font-mono">{formatDateTime(commit.createdAt)} · {project.name}</p>
                 </button>
@@ -143,6 +143,70 @@ export function Dashboard() {
   )
 }
 
+function CountUpValue({ value }: { value: string }) {
+  const numeric = Number(value)
+  const [display, setDisplay] = useState(Number.isFinite(numeric) ? numeric : 0)
+  const [reducedMotion, setReducedMotion] = useState(() => window.matchMedia('(prefers-reduced-motion: reduce)').matches)
+  const displayRef = useRef(display)
+  const frameRef = useRef<number | null>(null)
+
+  useEffect(() => {
+    const mediaQuery = window.matchMedia('(prefers-reduced-motion: reduce)')
+    const handleChange = (event: MediaQueryListEvent) => setReducedMotion(event.matches)
+
+    setReducedMotion(mediaQuery.matches)
+    mediaQuery.addEventListener('change', handleChange)
+
+    return () => mediaQuery.removeEventListener('change', handleChange)
+  }, [])
+
+  useEffect(() => {
+    if (frameRef.current !== null) {
+      window.cancelAnimationFrame(frameRef.current)
+      frameRef.current = null
+    }
+
+    if (!Number.isFinite(numeric)) return
+
+    if (reducedMotion) {
+      displayRef.current = numeric
+      setDisplay(numeric)
+      return
+    }
+
+    const start = displayRef.current
+    const delta = numeric - start
+    if (delta === 0) return
+
+    const startedAt = Date.now()
+    const duration = 420
+
+    const frame = () => {
+      const progress = Math.min(1, (Date.now() - startedAt) / duration)
+      const eased = 1 - Math.pow(1 - progress, 3)
+      const nextDisplay = Math.round(start + delta * eased)
+
+      displayRef.current = nextDisplay
+      setDisplay(nextDisplay)
+
+      if (progress < 1) {
+        frameRef.current = window.requestAnimationFrame(frame)
+      }
+    }
+
+    frameRef.current = window.requestAnimationFrame(frame)
+
+    return () => {
+      if (frameRef.current !== null) {
+        window.cancelAnimationFrame(frameRef.current)
+        frameRef.current = null
+      }
+    }
+  }, [numeric, reducedMotion])
+
+  return <>{Number.isFinite(numeric) ? display : value}</>
+}
+
 function StatCard({ icon, label, value, index }: { icon: React.ReactNode; label: string; value: string; index: number }) {
   return (
     <div className="glass-panel motion-card stagger-item rounded-[26px] p-5" style={{ '--stagger': index } as CSSProperties}>
@@ -150,7 +214,7 @@ function StatCard({ icon, label, value, index }: { icon: React.ReactNode; label:
         {icon}
         {label}
       </div>
-      <div className="text-[32px] font-semibold font-mono">{value}</div>
+      <div className="text-[32px] font-semibold font-mono"><CountUpValue value={value} /></div>
     </div>
   )
 }

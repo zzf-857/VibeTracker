@@ -323,6 +323,29 @@ body {
   transform: translateY(-1px);
 }
 
+.dashboard-project-card {
+  transition:
+    transform var(--motion-panel) var(--ease-emphasized),
+    background-color var(--motion-base) var(--ease-standard),
+    border-color var(--motion-base) var(--ease-standard),
+    box-shadow var(--motion-panel) var(--ease-emphasized);
+}
+
+.dashboard-project-card:hover {
+  transform: translateY(-4px) scale(1.004);
+  background: var(--bg-tertiary);
+}
+
+.dashboard-project-card:hover .gallery-cover {
+  transform: scale(1.045);
+  filter: brightness(1.05);
+}
+
+.recent-stream-item {
+  animation: recentStreamReveal 280ms var(--ease-emphasized) both;
+  animation-delay: calc(var(--stagger, 0) * 42ms);
+}
+
 .composer-panel {
   animation: composerExpand var(--motion-panel) var(--ease-emphasized) both;
   transform-origin: 88% 0%;
@@ -381,6 +404,17 @@ body {
 @keyframes galleryCardEnter {
   from { opacity: 0; }
   to { opacity: 1; }
+}
+
+@keyframes recentStreamReveal {
+  from {
+    opacity: 0;
+    filter: blur(3px);
+  }
+  to {
+    opacity: 1;
+    filter: blur(0);
+  }
 }
 
 @keyframes composerExpand {
@@ -644,5 +678,12 @@ body {
   .heatmap-pulse,
   .cover-sheen-layer::after {
     animation: none !important;
+  }
+
+  .recent-stream-item {
+    animation: none !important;
+    animation-delay: 0ms !important;
+    opacity: 1 !important;
+    filter: none !important;
   }
 }
