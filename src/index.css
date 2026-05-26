@@ -139,6 +139,16 @@ body {
   transform: scale(var(--press-scale));
 }
 
+.motion-action {
+  transition-property: transform, opacity, color, background-color, border-color, box-shadow;
+  transition-duration: var(--motion-fast), var(--motion-fast), var(--motion-base), var(--motion-base), var(--motion-base), var(--motion-base);
+  transition-timing-function: var(--ease-press), var(--ease-standard), var(--ease-standard), var(--ease-standard), var(--ease-standard), var(--ease-standard);
+}
+
+.motion-action:active {
+  transform: scale(var(--press-scale));
+}
+
 .motion-focus {
   transition-property: transform, opacity, border-color, box-shadow;
   transition-duration: var(--motion-fast), var(--motion-fast), var(--motion-base), var(--motion-base);
@@ -656,6 +666,43 @@ body {
   background: var(--text-tertiary);
 }
 
+.editor-backdrop {
+  animation: backdropIn var(--motion-panel) var(--ease-standard) both;
+}
+
+.editor-panel {
+  animation: panelSlideIn var(--motion-panel) var(--ease-emphasized) both;
+}
+
+.status-row,
+.tag-card {
+  transition:
+    transform var(--motion-base) var(--ease-standard),
+    border-color var(--motion-base) var(--ease-standard),
+    background-color var(--motion-base) var(--ease-standard),
+    box-shadow var(--motion-base) var(--ease-standard);
+}
+
+.status-row:hover,
+.tag-card:hover {
+  transform: translateY(-2px);
+  background: var(--bg-tertiary);
+}
+
+.tag-card.stagger-item {
+  animation-name: tagCardFadeIn;
+}
+
+@keyframes backdropIn {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+@keyframes tagCardFadeIn {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
 @media (prefers-reduced-motion: reduce) {
   *,
   *::before,
@@ -676,14 +723,20 @@ body {
   .ritual-settle,
   .motion-update,
   .heatmap-pulse,
+  .editor-backdrop,
+  .editor-panel,
+  .tag-card.stagger-item,
   .cover-sheen-layer::after {
     animation: none !important;
   }
 
-  .recent-stream-item {
+  .recent-stream-item,
+  .status-row,
+  .tag-card {
     animation: none !important;
     animation-delay: 0ms !important;
     opacity: 1 !important;
     filter: none !important;
+    transform: none !important;
   }
 }

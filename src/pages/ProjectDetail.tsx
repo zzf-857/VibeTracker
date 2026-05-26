@@ -467,16 +467,16 @@ function CommitEditor({
   }
 
   return (
-    <div className="fixed inset-0 z-50 bg-black/40 backdrop-blur-sm flex justify-end animate-[softReveal_180ms_ease-out]">
-      <aside className="w-[500px] h-full bg-[#111318] border-l border-border-primary p-6 shadow-2xl overflow-y-auto custom-scrollbar animate-[panelSlideIn_240ms_ease-out]">
+    <div className="fixed inset-0 z-50 bg-black/40 backdrop-blur-sm flex justify-end editor-backdrop">
+      <aside className="editor-panel w-[500px] h-full bg-[#111318] border-l border-border-primary p-6 shadow-2xl overflow-y-auto custom-scrollbar">
         <div className="flex items-center justify-between mb-6">
           <h2 className="text-xl font-semibold">编辑提交</h2>
-          <button onClick={onClose} className="text-text-tertiary hover:text-text-primary"><X size={18} /></button>
+          <button onClick={onClose} className="motion-action text-text-tertiary hover:text-text-primary"><X size={18} /></button>
         </div>
         <div className="space-y-4">
-          <input value={title} onChange={e => setTitle(e.target.value)} className="w-full bg-bg-secondary border border-border-subtle rounded-2xl px-4 py-3 text-sm outline-none" />
-          <textarea value={description} onChange={e => setDescription(e.target.value)} className="w-full bg-bg-secondary border border-border-subtle rounded-2xl px-4 py-3 text-sm outline-none h-40 resize-none" />
-          <input value={progressDelta} onChange={e => setProgressDelta(e.target.value)} className="w-full bg-bg-secondary border border-border-subtle rounded-2xl px-4 py-3 text-sm outline-none font-mono" placeholder="进度变化" />
+          <input value={title} onChange={e => setTitle(e.target.value)} className="motion-focus w-full bg-bg-secondary border border-border-subtle rounded-2xl px-4 py-3 text-sm outline-none" />
+          <textarea value={description} onChange={e => setDescription(e.target.value)} className="motion-focus w-full bg-bg-secondary border border-border-subtle rounded-2xl px-4 py-3 text-sm outline-none h-40 resize-none" />
+          <input value={progressDelta} onChange={e => setProgressDelta(e.target.value)} className="motion-focus w-full bg-bg-secondary border border-border-subtle rounded-2xl px-4 py-3 text-sm outline-none font-mono" placeholder="进度变化" />
           <div className="bg-bg-secondary border border-border-subtle rounded-[24px] p-4">
             <div className="flex items-center justify-between gap-3 mb-3">
               <div>
@@ -488,10 +488,10 @@ function CommitEditor({
             <input
               value={caption}
               onChange={e => setCaption(e.target.value)}
-              className="w-full bg-bg-tertiary border border-border-subtle rounded-full px-4 py-2.5 text-xs outline-none mb-3"
+              className="motion-focus w-full bg-bg-tertiary border border-border-subtle rounded-full px-4 py-2.5 text-xs outline-none mb-3"
               placeholder="新截图说明，可选"
             />
-            <button onClick={addImage} className="w-full bg-bg-tertiary border border-border-subtle rounded-full px-4 py-3 text-sm text-text-secondary hover:text-text-primary flex items-center justify-center gap-2">
+            <button onClick={addImage} className="motion-action w-full bg-bg-tertiary border border-border-subtle rounded-full px-4 py-3 text-sm text-text-secondary hover:text-text-primary flex items-center justify-center gap-2">
               <ImagePlus size={15} /> 添加截图路径
             </button>
             <div className="space-y-3 mt-4">
@@ -505,10 +505,10 @@ function CommitEditor({
                     <p className="text-[11px] text-text-tertiary font-mono truncate mt-1">{image.imagePath}</p>
                   </div>
                   <div className="flex items-center gap-1">
-                    <button onClick={() => onSetCover(image.imagePath)} className="p-2 rounded-full text-text-tertiary hover:text-text-primary hover:bg-bg-tertiary" title="设为封面">
+                    <button onClick={() => onSetCover(image.imagePath)} className="motion-action p-2 rounded-full text-text-tertiary hover:text-text-primary hover:bg-bg-tertiary" title="设为封面">
                       <Star size={14} />
                     </button>
-                    <button onClick={() => deleteImage(image.id)} className="p-2 rounded-full text-text-tertiary hover:text-accent-red hover:bg-bg-tertiary" title="删除截图">
+                    <button onClick={() => deleteImage(image.id)} className="motion-action p-2 rounded-full text-text-tertiary hover:text-accent-red hover:bg-bg-tertiary" title="删除截图">
                       <Trash2 size={14} />
                     </button>
                   </div>
@@ -517,7 +517,7 @@ function CommitEditor({
               {images.length === 0 && <p className="py-5 text-center text-sm text-text-tertiary">这条提交还没有截图。</p>}
             </div>
           </div>
-          <button onClick={save} disabled={!title.trim()} className="w-full bg-text-primary text-primary rounded-full px-4 py-3 text-sm font-semibold disabled:opacity-40">保存修改</button>
+          <button onClick={save} disabled={!title.trim()} className="motion-action w-full bg-text-primary text-primary rounded-full px-4 py-3 text-sm font-semibold disabled:opacity-40">保存修改</button>
         </div>
       </aside>
     </div>

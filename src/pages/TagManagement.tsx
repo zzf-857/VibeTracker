@@ -59,7 +59,7 @@ export function TagManagement() {
               type="text" 
               value={newTagName}
               onChange={e => setNewTagName(e.target.value)}
-              className="bg-bg-primary border border-border-subtle text-text-primary text-sm rounded-lg focus:ring-border-primary focus:border-border-primary outline-none block w-80 p-2.5 transition-all" 
+              className="motion-focus bg-bg-primary border border-border-subtle text-text-primary text-sm rounded-lg focus:ring-border-primary focus:border-border-primary outline-none block w-80 p-2.5 transition-all"
               placeholder="输入新标签名称..." 
             />
             
@@ -68,13 +68,13 @@ export function TagManagement() {
                 <button 
                   key={c}
                   onClick={() => setNewTagColor(c)}
-                  className={`w-6 h-6 rounded-full cursor-pointer transition-all ${newTagColor === c ? 'ring-2 ring-offset-2 ring-offset-bg-secondary ring-current' : 'opacity-70 hover:opacity-100'}`}
+                  className={`motion-action w-6 h-6 rounded-full cursor-pointer transition-all ${newTagColor === c ? 'ring-2 ring-offset-2 ring-offset-bg-secondary ring-current' : 'opacity-70 hover:opacity-100'}`}
                   style={{ backgroundColor: c, color: c }}
                 ></button>
               ))}
             </div>
 
-            <button onClick={handleCreateTag} className="ml-auto bg-text-primary text-bg-primary hover:bg-gray-200 font-semibold text-sm px-4 py-2.5 rounded-lg flex items-center gap-2 transition-all">
+            <button onClick={handleCreateTag} className="motion-action ml-auto bg-text-primary text-bg-primary hover:bg-gray-200 font-semibold text-sm px-4 py-2.5 rounded-lg flex items-center gap-2 transition-all">
               <Plus size={16} strokeWidth={2.5}/>
               创建标签
             </button>
@@ -87,7 +87,7 @@ export function TagManagement() {
           {tags.map(tag => {
             const linkedProjects = projects.filter(p => p.tags?.some(t => t.id === tag.id))
             return (
-              <div key={tag.id} className="motion-card stagger-item bg-bg-secondary rounded-[24px] border border-border-primary p-6 flex flex-col gap-5 relative group overflow-hidden transition-colors hover:border-border-subtle hover:bg-bg-tertiary" style={{ '--stagger': 1 } as CSSProperties}>
+              <div key={tag.id} className="tag-card motion-card stagger-item bg-bg-secondary rounded-[24px] border border-border-primary p-6 flex flex-col gap-5 relative group overflow-hidden" style={{ '--stagger': 1 } as CSSProperties}>
                  {/* Top section */}
                  <div className="flex justify-between items-start">
                     <div className="flex items-center gap-3">
@@ -100,10 +100,10 @@ export function TagManagement() {
                        </div>
                     </div>
                     <div className="flex gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
-                      <button className="w-8 h-8 rounded-md flex items-center justify-center bg-bg-tertiary text-text-secondary hover:text-text-primary hover:bg-border-subtle transition-colors">
+                      <button className="motion-action w-8 h-8 rounded-md flex items-center justify-center bg-bg-tertiary text-text-secondary hover:text-text-primary hover:bg-border-subtle transition-colors">
                         <Edit2 size={14} />
                       </button>
-                      <button onClick={() => handleDeleteTag(tag.id)} className="w-8 h-8 rounded-md flex items-center justify-center bg-bg-tertiary text-text-secondary hover:text-accent-red hover:bg-accent-red/10 transition-colors">
+                      <button onClick={() => handleDeleteTag(tag.id)} className="motion-action w-8 h-8 rounded-md flex items-center justify-center bg-bg-tertiary text-text-secondary hover:text-accent-red hover:bg-accent-red/10 transition-colors">
                         <Trash2 size={14} />
                       </button>
                     </div>

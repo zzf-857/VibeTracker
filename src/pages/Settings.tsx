@@ -106,7 +106,7 @@ export function Settings() {
 
           <div className="space-y-3">
             {statuses.map((status, index) => (
-              <div key={status.id} className="motion-card bg-bg-secondary border border-border-subtle rounded-[24px] p-4 grid grid-cols-[minmax(0,1fr)_auto_auto] gap-4 items-center">
+              <div key={status.id} className="status-row motion-card bg-bg-secondary border border-border-subtle rounded-[24px] p-4 grid grid-cols-[minmax(0,1fr)_auto_auto] gap-4 items-center">
                 <div className="flex items-center gap-3">
                   <span className="w-3 h-3 rounded-full flex-shrink-0 breathing-dot" style={{ backgroundColor: status.color }} />
                   <input
@@ -116,7 +116,7 @@ export function Settings() {
                       setPendingDeleteId(null)
                       setStatuses(prev => prev.map(item => item.id === status.id ? { ...item, name: e.target.value } : item))
                     }}
-                    className="bg-transparent text-sm outline-none w-full min-w-0"
+                    className="motion-focus bg-transparent text-sm outline-none w-full min-w-0"
                   />
                   <span className="text-xs text-text-tertiary whitespace-nowrap">{status.projectCount || 0} 项目</span>
                 </div>
@@ -131,32 +131,32 @@ export function Settings() {
                         setPendingDeleteId(null)
                         setStatuses(prev => prev.map(item => item.id === status.id ? { ...item, color } : item))
                       }}
-                      className={`h-7 w-7 rounded-full border transition ${status.color === color ? 'border-white/90 ring-2 ring-white/20' : 'border-white/10 hover:border-white/45'}`}
+                      className={`motion-action h-7 w-7 rounded-full border transition ${status.color === color ? 'border-white/90 ring-2 ring-white/20' : 'border-white/10 hover:border-white/45'}`}
                       style={{ backgroundColor: color }}
                     />
                   ))}
-                  <label className="relative h-7 w-7 rounded-full border border-white/10 bg-bg-tertiary cursor-pointer overflow-hidden hover:border-white/45" title="自定义颜色">
+                  <label className="motion-action relative h-7 w-7 rounded-full border border-white/10 bg-bg-tertiary cursor-pointer overflow-hidden hover:border-white/45" title="自定义颜色">
                     <input
                       type="color"
                       value={status.color}
                       onChange={e => setStatuses(prev => prev.map(item => item.id === status.id ? { ...item, color: e.target.value } : item))}
-                      className="absolute inset-0 h-10 w-10 -translate-x-1 -translate-y-1 cursor-pointer opacity-0"
+                      className="motion-focus absolute inset-0 h-10 w-10 -translate-x-1 -translate-y-1 cursor-pointer opacity-0"
                     />
                     <Palette size={13} className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 text-text-tertiary" />
                   </label>
                 </div>
                 <div className="flex items-center justify-end gap-1">
-                  <button type="button" title="上移" onClick={() => moveStatus(status.id, -1)} disabled={index === 0} className="h-8 w-8 rounded-full text-text-tertiary disabled:opacity-30 hover:bg-white/10 hover:text-text-primary flex items-center justify-center"><ArrowUp size={15} /></button>
-                  <button type="button" title="下移" onClick={() => moveStatus(status.id, 1)} disabled={index === statuses.length - 1} className="h-8 w-8 rounded-full text-text-tertiary disabled:opacity-30 hover:bg-white/10 hover:text-text-primary flex items-center justify-center"><ArrowDown size={15} /></button>
-                  <button type="button" title="保存" onClick={() => updateStatus(status.id, { name: status.name, color: status.color })} className="h-8 w-8 rounded-full text-text-tertiary hover:bg-white/10 hover:text-text-primary flex items-center justify-center"><Save size={14} /></button>
-                  <button type="button" title="删除" onClick={() => requestDeleteStatus(status)} className="h-8 w-8 rounded-full text-text-tertiary hover:bg-accent-red/10 hover:text-accent-red flex items-center justify-center"><Trash2 size={14} /></button>
+                  <button type="button" title="上移" onClick={() => moveStatus(status.id, -1)} disabled={index === 0} className="motion-action h-8 w-8 rounded-full text-text-tertiary disabled:opacity-30 hover:bg-white/10 hover:text-text-primary flex items-center justify-center"><ArrowUp size={15} /></button>
+                  <button type="button" title="下移" onClick={() => moveStatus(status.id, 1)} disabled={index === statuses.length - 1} className="motion-action h-8 w-8 rounded-full text-text-tertiary disabled:opacity-30 hover:bg-white/10 hover:text-text-primary flex items-center justify-center"><ArrowDown size={15} /></button>
+                  <button type="button" title="保存" onClick={() => updateStatus(status.id, { name: status.name, color: status.color })} className="motion-action h-8 w-8 rounded-full text-text-tertiary hover:bg-white/10 hover:text-text-primary flex items-center justify-center"><Save size={14} /></button>
+                  <button type="button" title="删除" onClick={() => requestDeleteStatus(status)} className="motion-action h-8 w-8 rounded-full text-text-tertiary hover:bg-accent-red/10 hover:text-accent-red flex items-center justify-center"><Trash2 size={14} /></button>
                 </div>
                 {pendingDeleteId === status.id && (
                   <div className="col-span-3 rounded-2xl border border-accent-red/25 bg-accent-red/10 px-4 py-3 flex items-center justify-between gap-3">
                     <span className="text-sm text-text-secondary">确认删除「{status.name}」？这个操作不会影响其他状态。</span>
                     <div className="flex items-center gap-2">
-                      <button type="button" onClick={() => deleteStatus(status)} className="h-8 px-3 rounded-full bg-accent-red text-white text-xs font-medium flex items-center gap-1.5"><Check size={13} /> 确认</button>
-                      <button type="button" onClick={() => setPendingDeleteId(null)} className="h-8 px-3 rounded-full bg-white/10 text-text-secondary text-xs font-medium flex items-center gap-1.5"><X size={13} /> 取消</button>
+                      <button type="button" onClick={() => deleteStatus(status)} className="motion-action h-8 px-3 rounded-full bg-accent-red text-white text-xs font-medium flex items-center gap-1.5"><Check size={13} /> 确认</button>
+                      <button type="button" onClick={() => setPendingDeleteId(null)} className="motion-action h-8 px-3 rounded-full bg-white/10 text-text-secondary text-xs font-medium flex items-center gap-1.5"><X size={13} /> 取消</button>
                     </div>
                   </div>
                 )}
@@ -169,17 +169,17 @@ export function Settings() {
           <section className="glass-panel motion-card rounded-[32px] p-6 stagger-item" style={{ '--stagger': 2 } as CSSProperties}>
             <h2 className="text-lg font-semibold mb-4">新增状态</h2>
             <div className="space-y-3">
-              <input value={newName} onChange={e => setNewName(e.target.value)} className="w-full bg-bg-secondary border border-border-subtle rounded-2xl px-4 py-3 text-sm outline-none" placeholder="状态名称" />
+              <input value={newName} onChange={e => setNewName(e.target.value)} className="motion-focus w-full bg-bg-secondary border border-border-subtle rounded-2xl px-4 py-3 text-sm outline-none" placeholder="状态名称" />
               <div className="flex gap-2 flex-wrap">
                 {COLORS.map(color => (
-                  <button key={color} type="button" aria-label={`选择状态色 ${color}`} onClick={() => setNewColor(color)} className={`w-8 h-8 rounded-full border transition-transform ${newColor === color ? 'border-white scale-110' : 'border-white/10'}`} style={{ backgroundColor: color }} />
+                  <button key={color} type="button" aria-label={`选择状态色 ${color}`} onClick={() => setNewColor(color)} className={`motion-action w-8 h-8 rounded-full border transition-transform ${newColor === color ? 'border-white scale-110' : 'border-white/10'}`} style={{ backgroundColor: color }} />
                 ))}
-                <label className="relative h-8 w-8 rounded-full border border-white/10 bg-bg-tertiary cursor-pointer overflow-hidden hover:border-white/45" title="自定义颜色">
-                  <input type="color" value={newColor} onChange={e => setNewColor(e.target.value)} className="absolute inset-0 h-10 w-10 -translate-x-1 -translate-y-1 cursor-pointer opacity-0" />
+                <label className="motion-action relative h-8 w-8 rounded-full border border-white/10 bg-bg-tertiary cursor-pointer overflow-hidden hover:border-white/45" title="自定义颜色">
+                  <input type="color" value={newColor} onChange={e => setNewColor(e.target.value)} className="motion-focus absolute inset-0 h-10 w-10 -translate-x-1 -translate-y-1 cursor-pointer opacity-0" />
                   <Palette size={14} className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 text-text-tertiary" />
                 </label>
               </div>
-              <button onClick={createStatus} className="w-full bg-text-primary text-primary rounded-full px-4 py-3 text-sm font-semibold flex items-center justify-center gap-2">
+              <button onClick={createStatus} className="motion-action w-full bg-text-primary text-primary rounded-full px-4 py-3 text-sm font-semibold flex items-center justify-center gap-2">
                 <Plus size={15} /> 创建状态
               </button>
             </div>
