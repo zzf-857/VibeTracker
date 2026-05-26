@@ -2,6 +2,7 @@ import { type CSSProperties, useEffect, useMemo, useState } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import { CommitImage, Project, ProjectCommit, ProjectStatus } from '../types'
 import { ArrowLeft, Camera, ExternalLink, Folder, Github, ImagePlus, Pencil, Plus, RotateCcw, Save, Star, Trash2, X } from 'lucide-react'
+import { AnimatedPage } from '../components/AnimatedPage'
 import { SafeImage } from '../components/SafeImage'
 import { formatDateTime, getActivityLevel, getProjectCover, groupCommitsByDay } from '../lib/projectView'
 import { MOCK_MODE_LABEL, getMockProject, isMockProjectId, mockStatuses } from '../lib/mockData'
@@ -116,7 +117,7 @@ export function ProjectDetail() {
   if (!project) return <div className="p-10 text-text-secondary">正在读取项目...</div>
 
   return (
-    <div className="page-enter flex flex-col min-h-full w-full py-8 px-10 gap-7">
+    <AnimatedPage tone="detail" className="flex flex-col min-h-full w-full py-8 px-10 gap-7">
       <button onClick={() => navigate(-1)} className="flex items-center gap-2 text-text-tertiary hover:text-text-primary self-start transition-colors">
         <ArrowLeft size={16} /> 返回
       </button>
@@ -316,7 +317,7 @@ export function ProjectDetail() {
           onChanged={loadData}
         />
       )}
-    </div>
+    </AnimatedPage>
   )
 }
 

@@ -1,6 +1,7 @@
 import { type CSSProperties, useEffect, useState } from 'react'
 import { Tag, Project } from '../types'
 import { Tags, FolderKanban, Plus, Trash2, Edit2 } from 'lucide-react'
+import { AnimatedPage } from '../components/AnimatedPage'
 
 // Define some standard colors for selection
 const COLORS = [
@@ -44,7 +45,7 @@ export function TagManagement() {
   }
 
   return (
-    <div className="page-enter flex flex-col h-full w-full py-8 px-10 gap-8">
+    <AnimatedPage tone="system" className="flex flex-col h-full w-full py-8 px-10 gap-8">
       {/* Header & Controls */}
       <div className="stagger-item flex flex-col gap-6" style={{ '--stagger': 0 } as CSSProperties}>
         <div>
@@ -139,6 +140,6 @@ export function TagManagement() {
           </div>
         )}
       </div>
-    </div>
+    </AnimatedPage>
   )
 }

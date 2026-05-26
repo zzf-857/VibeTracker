@@ -1,5 +1,6 @@
 import { type CSSProperties, useEffect, useState } from 'react'
 import { AlertTriangle, ArrowDown, ArrowUp, Check, Palette, Plus, Save, Trash2, X } from 'lucide-react'
+import { AnimatedPage } from '../components/AnimatedPage'
 import { ProjectStatus } from '../types'
 import { validateStatusName } from '../lib/statusValidation'
 
@@ -80,7 +81,7 @@ export function Settings() {
   }
 
   return (
-    <div className="page-enter flex flex-col min-h-full w-full py-8 px-10 gap-8">
+    <AnimatedPage tone="system" className="flex flex-col min-h-full w-full py-8 px-10 gap-8">
       <div className="stagger-item" style={{ '--stagger': 0 } as CSSProperties}>
         <p className="text-text-tertiary text-sm mb-2">Preferences</p>
         <h1 className="text-[34px] font-semibold tracking-normal">设置</h1>
@@ -195,6 +196,6 @@ export function Settings() {
           </section>
         </aside>
       </div>
-    </div>
+    </AnimatedPage>
   )
 }

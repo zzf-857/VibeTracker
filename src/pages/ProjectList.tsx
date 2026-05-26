@@ -2,6 +2,7 @@ import { type CSSProperties, useEffect, useMemo, useState } from 'react'
 import { Project, ProjectStatus, Tag } from '../types'
 import { Search, Plus, Image, Sparkles, Folder, X } from 'lucide-react'
 import { useNavigate } from 'react-router-dom'
+import { AnimatedPage } from '../components/AnimatedPage'
 import { SafeImage } from '../components/SafeImage'
 import { formatDateTime, getProjectCover, getRecentCommit } from '../lib/projectView'
 import { MOCK_MODE_LABEL, mockProjects, mockStatuses, mockTags } from '../lib/mockData'
@@ -73,7 +74,7 @@ export function ProjectList() {
   }
 
   return (
-    <div className="page-enter flex flex-col min-h-full w-full py-8 px-10 gap-8">
+    <AnimatedPage tone="gallery" className="flex flex-col min-h-full w-full py-8 px-10 gap-8">
       <div className="stagger-item flex items-end justify-between gap-8" style={{ '--stagger': 0 } as CSSProperties}>
         <div>
           <p className="text-text-tertiary text-sm mb-2">Project Gallery</p>
@@ -192,7 +193,7 @@ export function ProjectList() {
           </div>
         </div>
       )}
-    </div>
+    </AnimatedPage>
   )
 }
 

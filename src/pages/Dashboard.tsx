@@ -2,6 +2,7 @@ import { type CSSProperties, useEffect, useMemo, useState } from 'react'
 import { Activity, Clock3, FolderOpen, Plus, Sparkles } from 'lucide-react'
 import { Project, ProjectCommit, ProjectStatus } from '../types'
 import { useNavigate } from 'react-router-dom'
+import { AnimatedPage } from '../components/AnimatedPage'
 import { SafeImage } from '../components/SafeImage'
 import { formatDateKey, formatDateTime, getActivityLevel, getProjectCover, getRecentCommit, groupCommitsByDay } from '../lib/projectView'
 import { MOCK_MODE_LABEL, mockCommits, mockProjects, mockStatuses } from '../lib/mockData'
@@ -41,7 +42,7 @@ export function Dashboard() {
   const recentSevenDayCount = displayCommits.filter(commit => Date.now() - commit.createdAt <= 7 * 24 * 60 * 60 * 1000).length
 
   return (
-    <div className="page-enter flex flex-col min-h-full w-full py-8 px-10 gap-8">
+    <AnimatedPage tone="standard" className="flex flex-col min-h-full w-full py-8 px-10 gap-8">
       <div className="stagger-item flex items-end justify-between" style={{ '--stagger': 0 } as CSSProperties}>
         <div>
           <p className="text-text-tertiary text-sm mb-2">Vibe Progress Center</p>
@@ -138,7 +139,7 @@ export function Dashboard() {
           </section>
         </aside>
       </div>
-    </div>
+    </AnimatedPage>
   )
 }
 
