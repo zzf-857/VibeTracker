@@ -145,10 +145,11 @@ export function Dashboard() {
 
 function CountUpValue({ value }: { value: string }) {
   const numeric = Number(value)
-  const [display, setDisplay] = useState(Number.isFinite(numeric) ? numeric : 0)
   const [reducedMotion, setReducedMotion] = useState(() => window.matchMedia('(prefers-reduced-motion: reduce)').matches)
+  const [display, setDisplay] = useState(() => (window.matchMedia('(prefers-reduced-motion: reduce)').matches ? (Number.isFinite(numeric) ? numeric : 0) : 0))
   const displayRef = useRef(display)
   const frameRef = useRef<number | null>(null)
+  const hasAnimatedRef = useRef(false)
 
   useEffect(() => {
     const mediaQuery = window.matchMedia('(prefers-reduced-motion: reduce)')
@@ -169,14 +170,17 @@ function CountUpValue({ value }: { value: string }) {
     if (!Number.isFinite(numeric)) return
 
     if (reducedMotion) {
+      hasAnimatedRef.current = true
       displayRef.current = numeric
       setDisplay(numeric)
       return
     }
 
-    const start = displayRef.current
+    const start = hasAnimatedRef.current ? displayRef.current : 0
     const delta = numeric - start
     if (delta === 0) return
+
+    hasAnimatedRef.current = true
 
     const startedAt = Date.now()
     const duration = 420
