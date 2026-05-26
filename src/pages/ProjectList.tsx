@@ -4,6 +4,7 @@ import { Search, Plus, Image, Sparkles, Folder, X } from 'lucide-react'
 import { useNavigate } from 'react-router-dom'
 import { AnimatedPage } from '../components/AnimatedPage'
 import { SafeImage } from '../components/SafeImage'
+import { getStaggerStyle } from '../lib/motion'
 import { formatDateTime, getProjectCover, getRecentCommit } from '../lib/projectView'
 import { MOCK_MODE_LABEL, mockProjects, mockStatuses, mockTags } from '../lib/mockData'
 
@@ -94,7 +95,7 @@ export function ProjectList() {
       </div>
 
       {isComposerOpen && (
-        <section className="glass-panel ambient-panel rounded-[30px] p-4 animate-[softReveal_220ms_ease-out]">
+        <section className="glass-panel ambient-panel composer-panel rounded-[30px] p-4">
           <div className="grid grid-cols-[minmax(220px,1.15fr)_minmax(180px,0.9fr)_170px_auto] gap-3 items-center">
             <div className="relative">
               <Sparkles size={15} className="absolute left-4 top-1/2 -translate-y-1/2 text-accent-blue" />
@@ -102,20 +103,20 @@ export function ProjectList() {
                 autoFocus
                 value={newProjectName}
                 onChange={e => setNewProjectName(e.target.value)}
-                className="w-full h-12 bg-bg-tertiary border border-border-subtle rounded-full pl-11 pr-4 text-sm text-text-primary placeholder:text-text-tertiary outline-none focus:border-border-primary"
+                className="motion-focus w-full h-12 bg-bg-tertiary border border-border-subtle rounded-full pl-11 pr-4 text-sm text-text-primary placeholder:text-text-tertiary outline-none focus:border-border-primary"
                 placeholder="项目名称"
               />
             </div>
             <input
               value={newProjectDescription}
               onChange={e => setNewProjectDescription(e.target.value)}
-              className="h-12 bg-bg-tertiary border border-border-subtle rounded-full px-4 text-sm text-text-primary placeholder:text-text-tertiary outline-none focus:border-border-primary"
+              className="motion-focus h-12 bg-bg-tertiary border border-border-subtle rounded-full px-4 text-sm text-text-primary placeholder:text-text-tertiary outline-none focus:border-border-primary"
               placeholder="一句话介绍"
             />
             <select
               value={newProjectStatus}
               onChange={e => setNewProjectStatus(e.target.value)}
-              className="h-12 bg-bg-tertiary border border-border-subtle rounded-full px-4 text-sm text-text-primary outline-none focus:border-border-primary"
+              className="motion-focus h-12 bg-bg-tertiary border border-border-subtle rounded-full px-4 text-sm text-text-primary outline-none focus:border-border-primary"
             >
               {(statuses.length ? statuses : mockStatuses).map(status => <option key={status.id} value={status.id}>{status.name}</option>)}
             </select>
@@ -123,13 +124,13 @@ export function ProjectList() {
               <button
                 onClick={createProject}
                 disabled={!newProjectName.trim()}
-                className="h-12 px-5 rounded-full bg-text-primary text-primary text-sm font-semibold flex items-center gap-2 transition-opacity hover:opacity-90 disabled:opacity-35"
+                className="motion-press h-12 px-5 rounded-full bg-text-primary text-primary text-sm font-semibold flex items-center gap-2 transition-opacity hover:opacity-90 disabled:opacity-35"
               >
                 <Plus size={15} /> 创建
               </button>
               <button
                 onClick={closeComposer}
-                className="h-12 w-12 rounded-full bg-bg-tertiary border border-border-subtle text-text-tertiary hover:text-text-primary transition-colors grid place-items-center"
+                className="composer-close-button h-12 w-12 rounded-full bg-bg-tertiary border border-border-subtle text-text-tertiary hover:text-text-primary grid place-items-center"
                 title="关闭"
               >
                 <X size={16} />
@@ -141,7 +142,7 @@ export function ProjectList() {
             <input
               value={newProjectPath}
               onChange={e => setNewProjectPath(e.target.value)}
-              className="w-full h-11 bg-bg-secondary border border-border-subtle rounded-full pl-10 pr-4 text-xs text-text-secondary placeholder:text-text-tertiary outline-none focus:border-border-primary font-mono"
+              className="motion-focus w-full h-11 bg-bg-secondary border border-border-subtle rounded-full pl-10 pr-4 text-xs text-text-secondary placeholder:text-text-tertiary outline-none focus:border-border-primary font-mono"
               placeholder="本地路径，可选，例如 C:\\Projects\\VibeTracker"
             />
           </div>
@@ -178,7 +179,7 @@ export function ProjectList() {
         </div>
       </div>
 
-      <div className="grid grid-cols-3 gap-6 pb-10">
+      <div key={activeTag ?? 'all'} className="gallery-grid grid grid-cols-3 gap-6 pb-10">
         {filteredProjects.map((project, index) => (
           <ProjectGalleryCard key={project.id} project={project} index={index} onOpen={() => navigate(`/project/${project.id}`)} />
         ))}
@@ -204,12 +205,12 @@ function ProjectGalleryCard({ project, onOpen, index }: { project: Project; onOp
   return (
     <button
       onClick={onOpen}
-      className="group text-left glass-panel ambient-panel motion-card stagger-item rounded-[30px] overflow-hidden min-h-[360px] flex flex-col transition-all duration-[220ms] hover:-translate-y-1 hover:bg-bg-tertiary"
-      style={{ '--stagger': index + 2 } as CSSProperties}
+      className="group text-left glass-panel ambient-panel motion-card gallery-card gallery-card-enter rounded-[30px] overflow-hidden min-h-[360px] flex flex-col"
+      style={getStaggerStyle(index + 2)}
     >
       {cover ? (
         <div className="h-44 overflow-hidden bg-bg-tertiary">
-          <SafeImage src={cover} alt={`${project.name} 封面`} className="h-full w-full object-cover transition-transform duration-300 group-hover:scale-[1.03]" />
+          <SafeImage src={cover} alt={`${project.name} 封面`} className="h-full w-full object-cover gallery-cover" />
         </div>
       ) : (
         <div className="h-44 p-5 flex flex-col justify-end bg-bg-tertiary/60">
@@ -231,7 +232,7 @@ function ProjectGalleryCard({ project, onOpen, index }: { project: Project; onOp
         <p className="text-sm text-text-secondary mt-3 line-clamp-2 min-h-[42px]">{project.description || '这个项目还没有简介。'}</p>
         <div className="mt-auto pt-5 border-t border-border-subtle">
         <p className="text-xs text-text-tertiary mb-2 font-mono">{recentCommit ? formatDateTime(recentCommit.createdAt) : 'NO COMMIT YET'}</p>
-          <p className="text-sm text-text-primary font-medium truncate">{recentCommit?.title || '还没有进展提交'}</p>
+          <p className="gallery-card-recent text-sm text-text-primary font-medium truncate">{recentCommit?.title || '还没有进展提交'}</p>
           <div className="flex items-center justify-between gap-3 mt-3">
             <div className="flex items-center gap-1.5 min-w-0">
               {(project.tags || []).slice(0, 3).map(tag => (

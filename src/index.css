@@ -281,6 +281,77 @@ body {
   background: var(--accent-orange);
 }
 
+.gallery-grid {
+  animation: galleryReflow 240ms var(--ease-standard) both;
+}
+
+.gallery-card {
+  transition:
+    transform var(--motion-panel) var(--ease-emphasized),
+    border-color var(--motion-base) var(--ease-standard),
+    background-color var(--motion-base) var(--ease-standard),
+    box-shadow var(--motion-panel) var(--ease-emphasized);
+}
+
+.gallery-card:hover {
+  transform: translateY(-6px) scale(1.006);
+}
+
+.gallery-card-enter {
+  animation: galleryCardEnter var(--motion-panel) var(--ease-emphasized) both;
+  animation-delay: calc(var(--stagger, 0) * 55ms);
+}
+
+.gallery-cover {
+  transition: transform 700ms var(--ease-emphasized), filter 280ms var(--ease-standard);
+}
+
+.gallery-card:hover .gallery-cover {
+  transform: scale(1.045);
+  filter: brightness(1.05);
+}
+
+.gallery-card-recent {
+  transition: color var(--motion-base) var(--ease-standard), transform var(--motion-base) var(--ease-standard);
+}
+
+.gallery-card:hover .gallery-card-recent {
+  color: var(--text-primary);
+  transform: translateY(-1px);
+}
+
+.composer-panel {
+  animation: composerExpand var(--motion-panel) var(--ease-emphasized) both;
+  transform-origin: 88% 0%;
+}
+
+.composer-close-button {
+  transition:
+    transform var(--motion-fast) var(--ease-press),
+    color var(--motion-base) var(--ease-standard),
+    background-color var(--motion-base) var(--ease-standard),
+    border-color var(--motion-base) var(--ease-standard);
+}
+
+.composer-close-button:active {
+  transform: scale(var(--press-scale));
+}
+
+@keyframes galleryReflow {
+  from { opacity: 0.82; transform: translateY(4px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+@keyframes galleryCardEnter {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+@keyframes composerExpand {
+  from { opacity: 0; transform: translateY(-10px) scale(0.985); }
+  to { opacity: 1; transform: translateY(0) scale(1); }
+}
+
 @keyframes softReveal {
   from {
     opacity: 0;
