@@ -195,12 +195,15 @@ body {
   animation: heatmapPulse var(--motion-ritual) var(--ease-emphasized) both;
 }
 
-.cover-sheen {
-  position: relative;
+.cover-sheen-layer {
+  position: absolute;
+  inset: 0;
+  z-index: 1;
+  pointer-events: none;
   overflow: hidden;
 }
 
-.cover-sheen::after {
+.cover-sheen-layer::after {
   content: "";
   position: absolute;
   inset: 0;
@@ -335,6 +338,39 @@ body {
 
 .composer-close-button:active {
   transform: scale(var(--press-scale));
+}
+
+.commit-composer {
+  transition:
+    border-color var(--motion-base) var(--ease-standard),
+    box-shadow var(--motion-base) var(--ease-standard),
+    transform var(--motion-fast) var(--ease-press);
+}
+
+.commit-composer-button {
+  transition-property: transform, opacity, color, background-color, border-color;
+  transition-duration: var(--motion-fast), var(--motion-fast), var(--motion-base), var(--motion-base), var(--motion-base);
+  transition-timing-function: var(--ease-press), var(--ease-standard), var(--ease-standard), var(--ease-standard), var(--ease-standard);
+}
+
+.commit-card {
+  transform-origin: 24px 24px;
+}
+
+.commit-card-new {
+  border-color: rgba(99, 214, 147, 0.32);
+}
+
+.commit-card-new::after {
+  content: "";
+  position: absolute;
+  left: -36px;
+  top: 20px;
+  width: 26px;
+  height: 26px;
+  border-radius: 999px;
+  border: 1px solid rgba(99, 214, 147, 0.28);
+  animation: ritualPing 760ms var(--ease-emphasized) both;
 }
 
 @keyframes galleryReflow {
@@ -606,7 +642,7 @@ body {
   .ritual-settle,
   .motion-update,
   .heatmap-pulse,
-  .cover-sheen::after {
+  .cover-sheen-layer::after {
     animation: none !important;
   }
 }

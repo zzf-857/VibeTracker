@@ -1,10 +1,10 @@
-import { type CSSProperties, useEffect, useMemo, useState } from 'react'
+import { type CSSProperties, useEffect, useMemo, useRef, useState } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import { CommitImage, Project, ProjectCommit, ProjectStatus } from '../types'
 import { ArrowLeft, Camera, ExternalLink, Folder, Github, ImagePlus, Pencil, Plus, RotateCcw, Save, Star, Trash2, X } from 'lucide-react'
 import { AnimatedPage } from '../components/AnimatedPage'
 import { SafeImage } from '../components/SafeImage'
-import { formatDateTime, getActivityLevel, getProjectCover, groupCommitsByDay } from '../lib/projectView'
+import { formatDateKey, formatDateTime, getActivityLevel, getProjectCover, groupCommitsByDay } from '../lib/projectView'
 import { MOCK_MODE_LABEL, getMockProject, isMockProjectId, mockStatuses } from '../lib/mockData'
 
 export function ProjectDetail() {
@@ -16,13 +16,30 @@ export function ProjectDetail() {
   const [commitDescription, setCommitDescription] = useState('')
   const [progressDelta, setProgressDelta] = useState('')
   const [commitImagePath, setCommitImagePath] = useState('')
+  const [ritualCommitId, setRitualCommitId] = useState<string | null>(null)
+  const [ritualStartedAt, setRitualStartedAt] = useState<number>(0)
+  const [coverRitualKey, setCoverRitualKey] = useState('')
+  const [isCreatingCommit, setIsCreatingCommit] = useState(false)
   const [editingCommit, setEditingCommit] = useState<ProjectCommit | null>(null)
   const [isEditingProject, setIsEditingProject] = useState(false)
   const [projectDraft, setProjectDraft] = useState({ name: '', description: '', path: '', repoUrl: '' })
+  const isMountedRef = useRef(true)
+  const creatingCommitRef = useRef(false)
+  const ritualTimeoutRef = useRef<number | null>(null)
+  const coverRitualTimeoutRef = useRef<number | null>(null)
 
   useEffect(() => {
     loadData()
   }, [id])
+
+  useEffect(() => {
+    isMountedRef.current = true
+    return () => {
+      isMountedRef.current = false
+      if (ritualTimeoutRef.current !== null) window.clearTimeout(ritualTimeoutRef.current)
+      if (coverRitualTimeoutRef.current !== null) window.clearTimeout(coverRitualTimeoutRef.current)
+    }
+  }, [])
 
   useEffect(() => {
     if (!project) return
@@ -40,6 +57,7 @@ export function ProjectDetail() {
       window.ipcRenderer.invoke('get-project', id),
       window.ipcRenderer.invoke('get-statuses'),
     ])
+    if (!isMountedRef.current) return
     const mockProject = (!p || Array.isArray(p)) && isMockProjectId(id) ? getMockProject(id) : null
     setProject(mockProject || p)
     setStatuses(mockProject ? mockStatuses : s)
@@ -48,32 +66,79 @@ export function ProjectDetail() {
   const commits = project?.commits || []
   const cover = project ? getProjectCover(project) : ''
 
+  const clearRitualTimeout = () => {
+    if (ritualTimeoutRef.current === null) return
+    window.clearTimeout(ritualTimeoutRef.current)
+    ritualTimeoutRef.current = null
+  }
+
+  const clearCoverRitualTimeout = () => {
+    if (coverRitualTimeoutRef.current === null) return
+    window.clearTimeout(coverRitualTimeoutRef.current)
+    coverRitualTimeoutRef.current = null
+  }
+
+  const triggerCoverRitual = (keyBase: string, timestamp = Date.now()) => {
+    if (!isMountedRef.current) return
+    clearCoverRitualTimeout()
+    setCoverRitualKey(`${keyBase}:${timestamp}`)
+    coverRitualTimeoutRef.current = window.setTimeout(() => {
+      if (!isMountedRef.current) return
+      setCoverRitualKey('')
+      coverRitualTimeoutRef.current = null
+    }, 1000)
+  }
+
   const createCommit = async () => {
-    if (!project || !commitTitle.trim()) return
+    if (!project || !commitTitle.trim() || creatingCommitRef.current) return
     if (isMockProjectId(project.id)) return
-    await window.ipcRenderer.invoke('create-commit', {
-      projectId: project.id,
-      title: commitTitle.trim(),
-      description: commitDescription.trim(),
-      progressDelta: Number(progressDelta) || 0,
-      imagePath: commitImagePath.trim(),
-    })
-    setCommitTitle('')
-    setCommitDescription('')
-    setProgressDelta('')
-    setCommitImagePath('')
-    loadData()
+    creatingCommitRef.current = true
+    setIsCreatingCommit(true)
+    try {
+      const imagePath = commitImagePath.trim()
+      const createdId = await window.ipcRenderer.invoke('create-commit', {
+        projectId: project.id,
+        title: commitTitle.trim(),
+        description: commitDescription.trim(),
+        progressDelta: Number(progressDelta) || 0,
+        imagePath,
+      })
+      if (!isMountedRef.current) return
+      const now = Date.now()
+      clearRitualTimeout()
+      setRitualCommitId(createdId)
+      setRitualStartedAt(now)
+      if (imagePath) triggerCoverRitual(createdId, now)
+      setCommitTitle('')
+      setCommitDescription('')
+      setProgressDelta('')
+      setCommitImagePath('')
+      try {
+        await loadData()
+      } finally {
+        if (!isMountedRef.current) return
+        ritualTimeoutRef.current = window.setTimeout(() => {
+          if (!isMountedRef.current) return
+          setRitualCommitId(current => current === createdId ? null : current)
+          ritualTimeoutRef.current = null
+        }, 1200)
+      }
+    } finally {
+      creatingCommitRef.current = false
+      if (isMountedRef.current) setIsCreatingCommit(false)
+    }
   }
 
   const selectCommitImage = async () => {
     const path = await window.ipcRenderer.invoke('select-image')
-    if (path) setCommitImagePath(path)
+    if (path && isMountedRef.current) setCommitImagePath(path)
   }
 
   const updateStatus = async (statusId: string) => {
     if (!project) return
     if (isMockProjectId(project.id)) return
     await window.ipcRenderer.invoke('update-project', project.id, { status: statusId })
+    if (!isMountedRef.current) return
     loadData()
   }
 
@@ -86,6 +151,7 @@ export function ProjectDetail() {
       path: projectDraft.path.trim(),
       repoUrl: projectDraft.repoUrl.trim(),
     })
+    if (!isMountedRef.current) return
     setIsEditingProject(false)
     loadData()
   }
@@ -94,12 +160,14 @@ export function ProjectDetail() {
     if (!project) return
     if (isMockProjectId(project.id)) return
     await window.ipcRenderer.invoke('update-project', project.id, { coverImagePath: imagePath })
-    loadData()
+    if (!isMountedRef.current) return
+    if (imagePath) triggerCoverRitual(imagePath)
+    await loadData()
   }
 
   const selectManualCover = async () => {
     const path = await window.ipcRenderer.invoke('select-image')
-    if (path) setCoverFromPath(path)
+    if (path && isMountedRef.current) setCoverFromPath(path)
   }
 
   const openLocalPath = async () => {
@@ -216,6 +284,7 @@ export function ProjectDetail() {
           {cover ? (
             <div className="relative h-full min-h-[260px] group">
               <SafeImage src={cover} alt={`${project.name} 封面`} className="w-full h-full object-cover" />
+              {coverRitualKey && <span key={coverRitualKey} className="cover-sheen-layer" aria-hidden="true" />}
               <div className="absolute inset-x-0 bottom-0 p-4 bg-gradient-to-t from-black/65 to-transparent flex items-center gap-2">
                 <button onClick={selectManualCover} className="px-3 py-1.5 rounded-full bg-white/12 border border-white/15 text-xs text-white/85 hover:text-white backdrop-blur-md flex items-center gap-1.5">
                   <ImagePlus size={13} /> 更换封面
@@ -248,29 +317,28 @@ export function ProjectDetail() {
             </div>
           </div>
 
-          <div className="bg-bg-secondary border border-border-subtle rounded-[26px] p-4 mb-6">
+          <div className={`bg-bg-secondary border border-border-subtle rounded-[26px] p-4 mb-6 commit-composer ${ritualCommitId ? 'ritual-confirm' : ''}`}>
             <div className="grid grid-cols-[1fr_120px] gap-3 mb-3">
-              <input value={commitTitle} onChange={e => setCommitTitle(e.target.value)} className="bg-bg-tertiary border border-border-subtle rounded-2xl px-4 py-2.5 text-sm outline-none focus:border-border-primary" placeholder="提交标题，例如：完成项目详情页定调" />
-              <input value={progressDelta} onChange={e => setProgressDelta(e.target.value)} className="bg-bg-tertiary border border-border-subtle rounded-2xl px-4 py-2.5 text-sm outline-none focus:border-border-primary font-mono" placeholder="+0" />
+              <input value={commitTitle} onChange={e => setCommitTitle(e.target.value)} className="motion-focus bg-bg-tertiary border border-border-subtle rounded-2xl px-4 py-2.5 text-sm outline-none focus:border-border-primary" placeholder="提交标题，例如：完成项目详情页定调" />
+              <input value={progressDelta} onChange={e => setProgressDelta(e.target.value)} className="motion-focus bg-bg-tertiary border border-border-subtle rounded-2xl px-4 py-2.5 text-sm outline-none focus:border-border-primary font-mono" placeholder="+0" />
             </div>
-            <textarea value={commitDescription} onChange={e => setCommitDescription(e.target.value)} className="w-full bg-bg-tertiary border border-border-subtle rounded-2xl px-4 py-3 text-sm outline-none focus:border-border-primary resize-none h-20" placeholder="描述这次推进了什么、为什么重要..." />
+            <textarea value={commitDescription} onChange={e => setCommitDescription(e.target.value)} className="motion-focus w-full bg-bg-tertiary border border-border-subtle rounded-2xl px-4 py-3 text-sm outline-none focus:border-border-primary resize-none h-20" placeholder="描述这次推进了什么、为什么重要..." />
             <div className="flex items-center gap-2 mt-3">
-              <button onClick={selectCommitImage} className="px-4 py-2 rounded-full bg-bg-tertiary border border-border-subtle text-sm text-text-secondary hover:text-text-primary flex items-center gap-2 transition-colors">
+              <button onClick={selectCommitImage} className="motion-press commit-composer-button px-4 py-2 rounded-full bg-bg-tertiary border border-border-subtle text-sm text-text-secondary hover:text-text-primary flex items-center gap-2 transition-colors">
                 <ImagePlus size={15} /> 选择截图
               </button>
               {commitImagePath && <span className="text-xs text-text-tertiary truncate flex-1 font-mono">{commitImagePath}</span>}
-              <button onClick={createCommit} disabled={isMockProjectId(project.id)} className="ml-auto bg-text-primary text-primary rounded-full px-4 py-2 text-sm font-semibold flex items-center gap-2 transition-opacity hover:opacity-90 disabled:opacity-40">
-                <Plus size={15} /> {isMockProjectId(project.id) ? '展示中' : '提交'}
+              <button onClick={createCommit} disabled={isMockProjectId(project.id) || isCreatingCommit || !commitTitle.trim()} className="motion-press ml-auto bg-text-primary text-primary rounded-full px-4 py-2 text-sm font-semibold flex items-center gap-2 transition-opacity hover:opacity-90 disabled:opacity-40">
+                <Plus size={15} /> {isMockProjectId(project.id) ? '展示中' : isCreatingCommit ? '提交中' : '提交'}
               </button>
             </div>
           </div>
 
           <div className="relative pl-7 space-y-5 overflow-y-auto max-h-[540px] pr-2 custom-scrollbar before:absolute before:left-[7px] before:top-2 before:bottom-2 before:w-[2px] before:bg-border-primary">
-            {commits.map((commit, index) => (
+            {commits.map((commit) => (
               <CommitCard
                 key={commit.id}
                 commit={commit}
-                index={index}
                 onEdit={() => setEditingCommit(commit)}
                 onDelete={async () => {
                   if (!confirm('删除这条提交？')) return
@@ -278,6 +346,7 @@ export function ProjectDetail() {
                   loadData()
                 }}
                 onSetCover={(imagePath) => setCoverFromPath(imagePath)}
+                isNew={commit.id === ritualCommitId}
               />
             ))}
             {commits.length === 0 && (
@@ -289,7 +358,7 @@ export function ProjectDetail() {
         <aside className="flex flex-col gap-6">
           <section className="glass-panel motion-card rounded-[32px] p-6">
             <h2 className="text-xl font-semibold mb-5">提交热力图</h2>
-            <CommitHeatmap commits={commits} />
+            <CommitHeatmap commits={commits} pulseTimestamp={ritualStartedAt} />
           </section>
           <section className="glass-panel motion-card rounded-[32px] p-6">
             <h2 className="text-xl font-semibold mb-4">最近截图</h2>
@@ -321,9 +390,9 @@ export function ProjectDetail() {
   )
 }
 
-function CommitCard({ commit, index, onEdit, onDelete, onSetCover }: { commit: ProjectCommit; index: number; onEdit: () => void; onDelete: () => void; onSetCover: (path: string) => void }) {
+function CommitCard({ commit, onEdit, onDelete, onSetCover, isNew }: { commit: ProjectCommit; onEdit: () => void; onDelete: () => void; onSetCover: (path: string) => void; isNew?: boolean }) {
   return (
-    <article className="motion-card stagger-item relative bg-bg-secondary border border-border-subtle rounded-[24px] p-5 transition-all duration-[220ms] hover:bg-bg-tertiary before:absolute before:-left-[31px] before:top-6 before:w-4 before:h-4 before:rounded-full before:bg-status-completed before:border-[4px] before:border-[#111318]" style={{ '--stagger': index } as CSSProperties}>
+    <article className={`motion-card commit-card relative bg-bg-secondary border border-border-subtle rounded-[24px] p-5 transition-all duration-[220ms] hover:bg-bg-tertiary before:absolute before:-left-[31px] before:top-6 before:w-4 before:h-4 before:rounded-full before:bg-status-completed before:border-[4px] before:border-[#111318] ${isNew ? 'commit-card-new ritual-timeline' : ''}`}>
       <div className="flex items-start justify-between gap-4">
         <div>
           <h3 className="font-semibold text-lg">{commit.title}</h3>
@@ -455,8 +524,9 @@ function CommitEditor({
   )
 }
 
-function CommitHeatmap({ commits }: { commits: ProjectCommit[] }) {
+function CommitHeatmap({ commits, pulseTimestamp }: { commits: ProjectCommit[]; pulseTimestamp?: number }) {
   const counts = useMemo(() => groupCommitsByDay(commits), [commits])
+  const pulseKey = pulseTimestamp ? formatDateKey(pulseTimestamp) : ''
   const days = useMemo(() => {
     return Array.from({ length: 70 }).map((_, index) => {
       const date = new Date()
@@ -471,7 +541,7 @@ function CommitHeatmap({ commits }: { commits: ProjectCommit[] }) {
     <div className="grid grid-cols-[repeat(14,minmax(0,1fr))] gap-1">
       {days.map(day => {
         const className = ['bg-bg-tertiary', 'bg-status-completed/25', 'bg-status-completed/45', 'bg-status-completed/70', 'bg-status-completed'][day.level]
-        return <span key={day.key} title={`${day.key}: ${day.count} 次提交`} className={`aspect-square rounded-[5px] ${className}`} />
+        return <span key={`${day.key}:${day.key === pulseKey ? pulseTimestamp : 'stable'}`} title={`${day.key}: ${day.count} 次提交`} className={`aspect-square rounded-[5px] ${className} ${day.key === pulseKey ? 'heatmap-pulse' : ''}`} />
       })}
     </div>
   )
