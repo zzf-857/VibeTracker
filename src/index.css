@@ -359,6 +359,7 @@ body {
 .composer-panel {
   animation: composerExpand var(--motion-panel) var(--ease-emphasized) both;
   transform-origin: 88% 0%;
+  overflow: visible;
 }
 
 .composer-close-button {

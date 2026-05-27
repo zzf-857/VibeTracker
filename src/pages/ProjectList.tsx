@@ -100,7 +100,7 @@ export function ProjectList() {
       </div>
 
       {isComposerOpen && (
-        <section className="glass-panel ambient-panel composer-panel rounded-[30px] p-4">
+        <section className="glass-panel ambient-panel composer-panel rounded-[30px] p-4 z-30">
           <div className="grid grid-cols-[minmax(220px,1.15fr)_minmax(180px,0.9fr)_170px_auto] gap-3 items-center">
             <div className="relative">
               <Sparkles size={15} className="absolute left-4 top-1/2 -translate-y-1/2 text-accent-blue" />
