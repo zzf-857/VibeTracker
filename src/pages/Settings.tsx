@@ -1,5 +1,5 @@
-import { type CSSProperties, useEffect, useState } from 'react'
-import { AlertTriangle, ArrowDown, ArrowUp, Check, Palette, Plus, Save, Trash2, X } from 'lucide-react'
+import { type CSSProperties, useEffect, useRef, useState } from 'react'
+import { AlertTriangle, ArrowDown, ArrowUp, Check, GripVertical, Palette, Plus, Save, Trash2, X } from 'lucide-react'
 import { AnimatedPage } from '../components/AnimatedPage'
 import { ProjectStatus } from '../types'
 import { validateStatusName } from '../lib/statusValidation'
@@ -12,10 +12,19 @@ export function Settings() {
   const [newColor, setNewColor] = useState(COLORS[0])
   const [notice, setNotice] = useState('')
   const [pendingDeleteId, setPendingDeleteId] = useState<string | null>(null)
+  const [draggedStatusId, setDraggedStatusId] = useState<string | null>(null)
+  const [dragOverStatusId, setDragOverStatusId] = useState<string | null>(null)
+  const [isSavingOrder, setIsSavingOrder] = useState(false)
+  const statusesRef = useRef<ProjectStatus[]>([])
+  const dragStartOrderRef = useRef<ProjectStatus[]>([])
 
   useEffect(() => {
     loadStatuses()
   }, [])
+
+  useEffect(() => {
+    statusesRef.current = statuses
+  }, [statuses])
 
   const loadStatuses = async () => {
     setStatuses(await window.ipcRenderer.invoke('get-statuses'))
@@ -80,6 +89,45 @@ export function Settings() {
     loadStatuses()
   }
 
+  const previewDraggedStatus = (dragId: string, targetId: string) => {
+    if (dragId === targetId) return
+    setStatuses(prev => {
+      const from = prev.findIndex(status => status.id === dragId)
+      const to = prev.findIndex(status => status.id === targetId)
+      if (from < 0 || to < 0 || from === to) return prev
+      const next = [...prev]
+      const [item] = next.splice(from, 1)
+      next.splice(to, 0, item)
+      return next
+    })
+  }
+
+  const finishDragSort = async (dragId = draggedStatusId) => {
+    if (!dragId) return
+    const previous = dragStartOrderRef.current
+    const next = statusesRef.current
+    const previousIds = previous.map(status => status.id).join(',')
+    const nextIds = next.map(status => status.id).join(',')
+
+    setDraggedStatusId(null)
+    setDragOverStatusId(null)
+
+    if (!previous.length || previousIds === nextIds) return
+
+    setIsSavingOrder(true)
+    try {
+      await window.ipcRenderer.invoke('reorder-statuses', next.map(status => status.id))
+      setNotice('状态顺序已更新')
+      await loadStatuses()
+    } catch {
+      setStatuses(previous)
+      setNotice('状态顺序保存失败，已恢复原顺序')
+    } finally {
+      setIsSavingOrder(false)
+      dragStartOrderRef.current = []
+    }
+  }
+
   return (
     <AnimatedPage tone="system" className="flex flex-col min-h-full w-full py-8 px-10 gap-8">
       <div className="stagger-item" style={{ '--stagger': 0 } as CSSProperties}>
@@ -106,7 +154,40 @@ export function Settings() {
 
           <div className="space-y-3">
             {statuses.map((status, index) => (
-              <div key={status.id} className="status-row motion-card bg-bg-secondary border border-border-subtle rounded-[24px] p-4 grid grid-cols-[minmax(0,1fr)_auto_auto] gap-4 items-center">
+              <div
+                key={status.id}
+                onDragOver={e => {
+                  if (!draggedStatusId || draggedStatusId === status.id) return
+                  e.preventDefault()
+                  e.dataTransfer.dropEffect = 'move'
+                  setDragOverStatusId(status.id)
+                  previewDraggedStatus(draggedStatusId, status.id)
+                }}
+                onDrop={e => {
+                  e.preventDefault()
+                  finishDragSort()
+                }}
+                className={`status-row motion-card bg-bg-secondary border border-border-subtle rounded-[24px] p-4 grid grid-cols-[auto_minmax(0,1fr)_auto_auto] gap-4 items-center ${draggedStatusId === status.id ? 'status-row-dragging' : ''} ${dragOverStatusId === status.id ? 'status-row-drag-over' : ''}`}
+              >
+                <button
+                  type="button"
+                  draggable={!isSavingOrder}
+                  title="拖动排序"
+                  aria-label={`拖动排序 ${status.name}`}
+                  onDragStart={e => {
+                    if (isSavingOrder) return
+                    dragStartOrderRef.current = statuses
+                    setDraggedStatusId(status.id)
+                    setPendingDeleteId(null)
+                    setNotice('')
+                    e.dataTransfer.effectAllowed = 'move'
+                    e.dataTransfer.setData('text/plain', status.id)
+                  }}
+                  onDragEnd={() => finishDragSort(status.id)}
+                  className="status-drag-handle motion-action h-9 w-8 rounded-full text-text-tertiary hover:text-text-primary hover:bg-white/10 flex items-center justify-center cursor-grab active:cursor-grabbing"
+                >
+                  <GripVertical size={16} />
+                </button>
                 <div className="flex items-center gap-3">
                   <span className="w-3 h-3 rounded-full flex-shrink-0 breathing-dot" style={{ backgroundColor: status.color }} />
                   <input
@@ -146,13 +227,13 @@ export function Settings() {
                   </label>
                 </div>
                 <div className="flex items-center justify-end gap-1">
-                  <button type="button" title="上移" onClick={() => moveStatus(status.id, -1)} disabled={index === 0} className="motion-action h-8 w-8 rounded-full text-text-tertiary disabled:opacity-30 hover:bg-white/10 hover:text-text-primary flex items-center justify-center"><ArrowUp size={15} /></button>
-                  <button type="button" title="下移" onClick={() => moveStatus(status.id, 1)} disabled={index === statuses.length - 1} className="motion-action h-8 w-8 rounded-full text-text-tertiary disabled:opacity-30 hover:bg-white/10 hover:text-text-primary flex items-center justify-center"><ArrowDown size={15} /></button>
+                  <button type="button" title="上移" onClick={() => moveStatus(status.id, -1)} disabled={index === 0 || isSavingOrder} className="motion-action h-8 w-8 rounded-full text-text-tertiary disabled:opacity-30 hover:bg-white/10 hover:text-text-primary flex items-center justify-center"><ArrowUp size={15} /></button>
+                  <button type="button" title="下移" onClick={() => moveStatus(status.id, 1)} disabled={index === statuses.length - 1 || isSavingOrder} className="motion-action h-8 w-8 rounded-full text-text-tertiary disabled:opacity-30 hover:bg-white/10 hover:text-text-primary flex items-center justify-center"><ArrowDown size={15} /></button>
                   <button type="button" title="保存" onClick={() => updateStatus(status.id, { name: status.name, color: status.color })} className="motion-action h-8 w-8 rounded-full text-text-tertiary hover:bg-white/10 hover:text-text-primary flex items-center justify-center"><Save size={14} /></button>
                   <button type="button" title="删除" onClick={() => requestDeleteStatus(status)} className="motion-action h-8 w-8 rounded-full text-text-tertiary hover:bg-accent-red/10 hover:text-accent-red flex items-center justify-center"><Trash2 size={14} /></button>
                 </div>
                 {pendingDeleteId === status.id && (
-                  <div className="col-span-3 rounded-2xl border border-accent-red/25 bg-accent-red/10 px-4 py-3 flex items-center justify-between gap-3">
+                  <div className="col-span-4 rounded-2xl border border-accent-red/25 bg-accent-red/10 px-4 py-3 flex items-center justify-between gap-3">
                     <span className="text-sm text-text-secondary">确认删除「{status.name}」？这个操作不会影响其他状态。</span>
                     <div className="flex items-center gap-2">
                       <button type="button" onClick={() => deleteStatus(status)} className="motion-action h-8 px-3 rounded-full bg-accent-red text-white text-xs font-medium flex items-center gap-1.5"><Check size={13} /> 确认</button>

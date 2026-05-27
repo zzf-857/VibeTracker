@@ -761,6 +761,21 @@ body {
   background: var(--bg-tertiary);
 }
 
+.status-row-dragging {
+  opacity: 0.72;
+  transform: scale(0.992);
+  border-color: rgba(116, 169, 255, 0.32);
+  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.24);
+}
+
+.status-row-drag-over {
+  background: rgba(255, 255, 255, 0.12);
+}
+
+.status-drag-handle {
+  touch-action: none;
+}
+
 .tag-card.stagger-item {
   animation-name: tagCardFadeIn;
 }
@@ -804,6 +819,8 @@ body {
 
   .recent-stream-item,
   .status-row,
+  .status-row-dragging,
+  .status-row-drag-over,
   .tag-card {
     animation: none !important;
     animation-delay: 0ms !important;
