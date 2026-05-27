@@ -1,6 +1,6 @@
 import { type CSSProperties, useEffect, useMemo, useState } from 'react'
 import { Project, ProjectStatus, Tag } from '../types'
-import { Search, Plus, Image, Sparkles, Folder, X } from 'lucide-react'
+import { Check, ChevronDown, Search, Plus, Image, Sparkles, Folder, X } from 'lucide-react'
 import { useNavigate } from 'react-router-dom'
 import { AnimatedPage } from '../components/AnimatedPage'
 import { SafeImage } from '../components/SafeImage'
@@ -19,6 +19,7 @@ export function ProjectList() {
   const [newProjectPath, setNewProjectPath] = useState('')
   const [newProjectStatus, setNewProjectStatus] = useState('')
   const [isComposerOpen, setIsComposerOpen] = useState(false)
+  const [isStatusPickerOpen, setIsStatusPickerOpen] = useState(false)
   const navigate = useNavigate()
 
   useEffect(() => {
@@ -50,6 +51,8 @@ export function ProjectList() {
 
   const isMockMode = projects.length === 0
   const displayTags = isMockMode ? mockTags : tags
+  const displayStatuses = statuses.length ? statuses : mockStatuses
+  const selectedStatus = displayStatuses.find(status => status.id === newProjectStatus) || displayStatuses[0]
 
   const createProject = async () => {
     if (!newProjectName.trim()) return
@@ -64,11 +67,13 @@ export function ProjectList() {
     setNewProjectDescription('')
     setNewProjectPath('')
     setIsComposerOpen(false)
+    setIsStatusPickerOpen(false)
     navigate(`/project/${id}`)
   }
 
   const closeComposer = () => {
     setIsComposerOpen(false)
+    setIsStatusPickerOpen(false)
     setNewProjectName('')
     setNewProjectDescription('')
     setNewProjectPath('')
@@ -113,13 +118,43 @@ export function ProjectList() {
               className="motion-focus h-12 bg-bg-tertiary border border-border-subtle rounded-full px-4 text-sm text-text-primary placeholder:text-text-tertiary outline-none focus:border-border-primary"
               placeholder="一句话介绍"
             />
-            <select
-              value={newProjectStatus}
-              onChange={e => setNewProjectStatus(e.target.value)}
-              className="motion-focus h-12 bg-bg-tertiary border border-border-subtle rounded-full px-4 text-sm text-text-primary outline-none focus:border-border-primary"
-            >
-              {(statuses.length ? statuses : mockStatuses).map(status => <option key={status.id} value={status.id}>{status.name}</option>)}
-            </select>
+            <div className="relative z-20">
+              <button
+                type="button"
+                onClick={() => setIsStatusPickerOpen(prev => !prev)}
+                className="status-picker-trigger h-12 w-full bg-bg-tertiary border border-border-subtle rounded-full px-4 text-sm text-text-primary outline-none flex items-center justify-between gap-3"
+              >
+                <span className="min-w-0 flex items-center gap-2">
+                  {selectedStatus && <span className="w-2.5 h-2.5 rounded-full flex-shrink-0" style={{ backgroundColor: selectedStatus.color }} />}
+                  <span className="truncate">{selectedStatus?.name || '选择状态'}</span>
+                </span>
+                <ChevronDown size={15} className={`text-text-tertiary transition-transform duration-[180ms] ${isStatusPickerOpen ? 'rotate-180' : ''}`} />
+              </button>
+              {isStatusPickerOpen && (
+                <div className="status-picker-menu">
+                  {displayStatuses.map(status => {
+                    const isSelected = status.id === selectedStatus?.id
+                    return (
+                      <button
+                        type="button"
+                        key={status.id}
+                        onClick={() => {
+                          setNewProjectStatus(status.id)
+                          setIsStatusPickerOpen(false)
+                        }}
+                        className={`status-picker-option ${isSelected ? 'status-picker-option-active' : ''}`}
+                      >
+                        <span className="flex items-center gap-2 min-w-0">
+                          <span className="w-2.5 h-2.5 rounded-full flex-shrink-0" style={{ backgroundColor: status.color }} />
+                          <span className="truncate">{status.name}</span>
+                        </span>
+                        {isSelected && <Check size={14} className="flex-shrink-0" />}
+                      </button>
+                    )
+                  })}
+                </div>
+              )}
+            </div>
             <div className="flex items-center justify-end gap-2">
               <button
                 onClick={createProject}
