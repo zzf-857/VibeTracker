@@ -1,7 +1,7 @@
 import { type CSSProperties, useEffect, useMemo, useRef, useState } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import { CommitImage, Project, ProjectCommit, ProjectStatus, NoteBlock, Todo } from '../types'
-import { ArrowLeft, Camera, Check, CheckSquare, ExternalLink, Folder, Github, ImagePlus, Pencil, Plus, RotateCcw, Save, Square, Star, StickyNote, Trash2, X } from 'lucide-react'
+import { ArrowLeft, Camera, Check, CheckSquare, ChevronDown, ExternalLink, Folder, Github, ImagePlus, Pencil, Plus, RotateCcw, Save, Square, Star, StickyNote, Trash2, X } from 'lucide-react'
 import { AnimatedPage } from '../components/AnimatedPage'
 import { SafeImage } from '../components/SafeImage'
 import { formatDateKey, formatDateTime, getActivityLevel, getProjectCover, groupCommitsByDay } from '../lib/projectView'
@@ -100,6 +100,7 @@ export function ProjectDetail() {
   const [isEditingProject, setIsEditingProject] = useState(false)
   const [projectDraft, setProjectDraft] = useState({ name: '', description: '', path: '', repoUrl: '' })
   const [pendingDeleteProject, setPendingDeleteProject] = useState(false)
+  const [isStatusPickerOpen, setIsStatusPickerOpen] = useState(false)
   // NoteBlocks
   const [newNoteContent, setNewNoteContent] = useState('')
   const [editingNoteId, setEditingNoteId] = useState<string | null>(null)
@@ -338,7 +339,7 @@ export function ProjectDetail() {
       </button>
 
       <section className="stagger-item grid grid-cols-[1fr_360px] gap-6" style={{ '--stagger': 0 } as CSSProperties}>
-        <div className="glass-panel ambient-panel motion-card rounded-[32px] p-7 min-h-[260px] flex flex-col justify-between relative">
+        <div className="glass-panel ambient-panel motion-card rounded-[32px] p-7 min-h-[260px] flex flex-col justify-between relative z-30">
           <div>
             <div className="flex items-start justify-between gap-4">
               <div className="min-w-0 flex-1">
@@ -358,15 +359,44 @@ export function ProjectDetail() {
                 )}
               </div>
               <div className="flex items-center gap-2 flex-shrink-0 relative">
-                <select
-                  value={project.status}
-                  onChange={e => updateStatus(e.target.value)}
-                  disabled={isMock}
-                  className="bg-bg-tertiary border border-border-subtle rounded-full px-4 py-2 text-sm outline-none"
-                  style={{ color: project.statusInfo?.color || undefined }}
-                >
-                  {statuses.map(status => <option key={status.id} value={status.id}>{status.name}</option>)}
-                </select>
+                <div className="relative z-20">
+                  <button
+                    type="button"
+                    disabled={isMock}
+                    onClick={() => setIsStatusPickerOpen(prev => !prev)}
+                    className="status-picker-trigger h-9 bg-bg-tertiary border border-border-subtle rounded-full px-4 text-sm text-text-primary outline-none flex items-center justify-between gap-3 disabled:opacity-40 transition-colors"
+                  >
+                    <span className="min-w-0 flex items-center gap-2">
+                      {project.statusInfo && <span className="w-2 h-2 rounded-full flex-shrink-0" style={{ backgroundColor: project.statusInfo.color }} />}
+                      <span className="truncate" style={{ color: project.statusInfo?.color || undefined }}>{project.statusInfo?.name || '选择状态'}</span>
+                    </span>
+                    <ChevronDown size={14} className={`text-text-tertiary transition-transform duration-[180ms] ${isStatusPickerOpen ? 'rotate-180' : ''}`} />
+                  </button>
+                  {isStatusPickerOpen && !isMock && (
+                    <div className="status-picker-menu" style={{ width: '160px', right: 0, left: 'auto' }}>
+                      {statuses.map(status => {
+                        const isSelected = status.id === project.status
+                        return (
+                          <button
+                            type="button"
+                            key={status.id}
+                            onClick={() => {
+                              updateStatus(status.id)
+                              setIsStatusPickerOpen(false)
+                            }}
+                            className={`status-picker-option ${isSelected ? 'status-picker-option-active' : ''}`}
+                          >
+                            <span className="flex items-center gap-2 min-w-0">
+                              <span className="w-2.5 h-2.5 rounded-full flex-shrink-0" style={{ backgroundColor: status.color }} />
+                              <span className="truncate">{status.name}</span>
+                            </span>
+                            {isSelected && <Check size={14} className="flex-shrink-0" />}
+                          </button>
+                        )
+                      })}
+                    </div>
+                  )}
+                </div>
                 <button
                   onClick={() => setIsEditingProject(prev => !prev)}
                   disabled={isMock}
