@@ -866,8 +866,8 @@ function CommitHeatmap({ commits, pulseTimestamp }: { commits: ProjectCommit[]; 
   return (
     <div className="grid grid-cols-[repeat(14,minmax(0,1fr))] gap-1">
       {days.map(day => {
-        const className = ['bg-bg-tertiary', 'bg-status-completed/25', 'bg-status-completed/45', 'bg-status-completed/70', 'bg-status-completed'][day.level]
-        return <span key={`${day.key}:${day.key === pulseKey ? pulseTimestamp : 'stable'}`} title={`${day.key}: ${day.count} 次提交`} className={`aspect-square rounded-[5px] ${className} ${day.key === pulseKey ? 'heatmap-pulse' : ''}`} />
+        const className = ['bg-bg-tertiary', 'bg-status-level-1', 'bg-status-level-2', 'bg-status-level-3', 'bg-status-level-4'][day.level]
+        return <div key={`${day.key}:${day.key === pulseKey ? pulseTimestamp : 'stable'}`} title={`${day.key}: ${day.count} 次提交`} className={`w-full aspect-square rounded-[5px] transition-all duration-200 hover:scale-110 ${className} ${day.key === pulseKey ? 'heatmap-pulse' : ''}`} />
       })}
     </div>
   )

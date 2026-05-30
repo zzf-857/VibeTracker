@@ -54,6 +54,12 @@
   --press-scale: 0.98;
 }
 
+/* 状态热力图 4 档亮绿阶梯（直接使用标准的 rgba 定义，确保在所有浏览器中都完美支持） */
+.bg-status-level-1 { background-color: rgba(99, 214, 147, 0.24); } /* 25% 绿 */
+.bg-status-level-2 { background-color: rgba(99, 214, 147, 0.46); } /* 45% 绿 */
+.bg-status-level-3 { background-color: rgba(99, 214, 147, 0.72); } /* 70% 绿 */
+.bg-status-level-4 { background-color: rgb(99, 214, 147); }        /* 100% 满格绿 */
+
 body {
   background-color: var(--bg-primary);
   color: var(--text-primary);
