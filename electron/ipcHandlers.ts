@@ -12,6 +12,22 @@ const imageMimeTypes: Record<string, string> = {
   '.bmp': 'image/bmp',
 }
 
+/**
+ * 安全包裹 IPC handler，统一捕获异常并返回结构化错误信息。
+ * 对于 invoke 类的 handler，异常将以 rejected promise 的形式传到渲染进程。
+ */
+function safeHandle(channel: string, handler: (...args: any[]) => any) {
+  ipcMain.handle(channel, async (...args) => {
+    try {
+      return await handler(...args)
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error)
+      console.error(`[IPC:${channel}] 错误:`, message)
+      throw new Error(`操作失败 (${channel}): ${message}`)
+    }
+  })
+}
+
 function hydrateCommit(commit: any) {
   commit.images = db.prepare('SELECT * FROM commit_images WHERE commitId = ? ORDER BY sortIndex ASC, createdAt ASC').all(commit.id)
   return commit
@@ -54,74 +70,75 @@ function hydrateProject(project: any, includeDetail = false) {
 
 export function setupIpcHandlers() {
   // --- Projects ---
-  ipcMain.handle('get-projects', () => {
+  safeHandle('get-projects', () => {
     const projects = db.prepare('SELECT * FROM projects ORDER BY updatedAt DESC').all()
     return (projects as any[]).map(p => hydrateProject(p))
   })
 
-  ipcMain.handle('get-project', (_, id: string) => {
+  safeHandle('get-project', (_, id: string) => {
     const project = db.prepare('SELECT * FROM projects WHERE id = ?').get(id) as any
     if (!project) return null
     return hydrateProject(project, true)
   })
 
-  ipcMain.handle('create-project', (_, data: any) => {
+  safeHandle('create-project', (_, data: any) => {
     const id = crypto.randomUUID()
     const now = Date.now()
-    const stmnt = db.prepare(`
-      INSERT INTO projects (id, name, description, path, status, progress, createdAt, updatedAt)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?)
-    `)
     const defaultStatus = (db.prepare('SELECT id FROM project_statuses ORDER BY sortIndex ASC LIMIT 1').get() as any)?.id || 'status-developing'
-    stmnt.run(id, data.name, data.description || '', data.path || '', data.status || defaultStatus, data.progress || 0, now, now)
-    
-    if (data.tagIds && Array.isArray(data.tagIds)) {
-      const tagStmnt = db.prepare('INSERT INTO project_tags (projectId, tagId) VALUES (?, ?)')
-      const insertTags = db.transaction(() => {
+
+    const createProjectTx = db.transaction(() => {
+      db.prepare(`
+        INSERT INTO projects (id, name, description, path, status, progress, createdAt, updatedAt)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+      `).run(id, data.name, data.description || '', data.path || '', data.status || defaultStatus, data.progress || 0, now, now)
+      
+      if (data.tagIds && Array.isArray(data.tagIds)) {
+        const tagStmnt = db.prepare('INSERT INTO project_tags (projectId, tagId) VALUES (?, ?)')
         for (const tagId of data.tagIds) tagStmnt.run(id, tagId)
-      })
-      insertTags()
-    }
+      }
+    })
+    createProjectTx()
     return id
   })
 
-  ipcMain.handle('update-project', (_, id: string, data: any) => {
+  safeHandle('update-project', (_, id: string, data: any) => {
     const now = Date.now()
-    const fields = []
-    const values = []
     
-    const allowedFields = ['name', 'description', 'path', 'status', 'progress', 'coverImagePath', 'repoUrl']
-    for (const key of allowedFields) {
-      if (data[key] !== undefined) {
-        fields.push(`${key} = ?`)
-        values.push(data[key])
+    const updateProjectTx = db.transaction(() => {
+      const fields: string[] = []
+      const values: any[] = []
+      
+      const allowedFields = ['name', 'description', 'path', 'status', 'progress', 'coverImagePath', 'repoUrl']
+      for (const key of allowedFields) {
+        if (data[key] !== undefined) {
+          fields.push(`${key} = ?`)
+          values.push(data[key])
+        }
       }
-    }
-    
-    if (fields.length > 0) {
-      fields.push('updatedAt = ?')
-      values.push(now, id)
-      db.prepare(`UPDATE projects SET ${fields.join(', ')} WHERE id = ?`).run(...values)
-    }
+      
+      if (fields.length > 0) {
+        fields.push('updatedAt = ?')
+        values.push(now, id)
+        db.prepare(`UPDATE projects SET ${fields.join(', ')} WHERE id = ?`).run(...values)
+      }
 
-    if (data.tagIds !== undefined) {
-      db.prepare('DELETE FROM project_tags WHERE projectId = ?').run(id)
-      const tagStmnt = db.prepare('INSERT INTO project_tags (projectId, tagId) VALUES (?, ?)')
-      const insertTags = db.transaction(() => {
+      if (data.tagIds !== undefined) {
+        db.prepare('DELETE FROM project_tags WHERE projectId = ?').run(id)
+        const tagStmnt = db.prepare('INSERT INTO project_tags (projectId, tagId) VALUES (?, ?)')
         for (const tagId of data.tagIds) tagStmnt.run(id, tagId)
-      })
-      insertTags()
-    }
+      }
+    })
+    updateProjectTx()
     return true
   })
 
-  ipcMain.handle('delete-project', (_, id: string) => {
+  safeHandle('delete-project', (_, id: string) => {
     db.prepare('DELETE FROM projects WHERE id = ?').run(id)
     return true
   })
 
   // --- Statuses ---
-  ipcMain.handle('get-statuses', () => {
+  safeHandle('get-statuses', () => {
     const statuses = db.prepare('SELECT * FROM project_statuses ORDER BY sortIndex ASC, createdAt ASC').all() as any[]
     return statuses.map(status => ({
       ...status,
@@ -129,7 +146,7 @@ export function setupIpcHandlers() {
     }))
   })
 
-  ipcMain.handle('create-status', (_, data: any) => {
+  safeHandle('create-status', (_, data: any) => {
     const id = crypto.randomUUID()
     const now = Date.now()
     const maxSort = db.prepare('SELECT COALESCE(MAX(sortIndex), -1) AS maxSort FROM project_statuses').get() as any
@@ -138,7 +155,7 @@ export function setupIpcHandlers() {
     return id
   })
 
-  ipcMain.handle('update-status', (_, id: string, data: any) => {
+  safeHandle('update-status', (_, id: string, data: any) => {
     const now = Date.now()
     const fields: string[] = []
     const values: any[] = []
@@ -156,7 +173,7 @@ export function setupIpcHandlers() {
     return true
   })
 
-  ipcMain.handle('delete-status', (_, id: string) => {
+  safeHandle('delete-status', (_, id: string) => {
     const statusCount = (db.prepare('SELECT COUNT(*) AS count FROM project_statuses').get() as any).count
     if (statusCount <= 1) return { ok: false, reason: '至少需要保留一个状态' }
     const projectCount = (db.prepare('SELECT COUNT(*) AS count FROM projects WHERE status = ?').get(id) as any).count
@@ -165,7 +182,7 @@ export function setupIpcHandlers() {
     return { ok: true }
   })
 
-  ipcMain.handle('reorder-statuses', (_, orderedIds: string[]) => {
+  safeHandle('reorder-statuses', (_, orderedIds: string[]) => {
     const update = db.prepare('UPDATE project_statuses SET sortIndex = ?, updatedAt = ? WHERE id = ?')
     const now = Date.now()
     const reorder = db.transaction(() => {
@@ -175,7 +192,7 @@ export function setupIpcHandlers() {
     return true
   })
 
-  ipcMain.handle('select-image', async () => {
+  safeHandle('select-image', async () => {
     const result = await dialog.showOpenDialog({
       properties: ['openFile'],
       filters: [
@@ -185,19 +202,19 @@ export function setupIpcHandlers() {
     return result.canceled ? null : result.filePaths[0]
   })
 
-  ipcMain.handle('open-local-path', async (_, localPath: string) => {
+  safeHandle('open-local-path', async (_, localPath: string) => {
     if (!localPath) return { ok: false, reason: '缺少本地路径' }
     const result = await shell.openPath(localPath)
     return result ? { ok: false, reason: result } : { ok: true }
   })
 
-  ipcMain.handle('open-external-url', async (_, url: string) => {
+  safeHandle('open-external-url', async (_, url: string) => {
     if (!/^https?:\/\//i.test(url || '')) return { ok: false, reason: '链接必须以 http:// 或 https:// 开头' }
     await shell.openExternal(url)
     return { ok: true }
   })
 
-  ipcMain.handle('read-image-data-url', async (_, imagePath: string) => {
+  safeHandle('read-image-data-url', async (_, imagePath: string) => {
     if (!imagePath || /^(data|https?):/i.test(imagePath)) return imagePath || null
     const ext = path.extname(imagePath).toLowerCase()
     const mime = imageMimeTypes[ext]
@@ -211,26 +228,30 @@ export function setupIpcHandlers() {
   })
 
   // --- Project Commits ---
-  ipcMain.handle('get-commits', (_, projectId: string) => {
+  safeHandle('get-commits', (_, projectId: string) => {
     return (db.prepare('SELECT * FROM project_commits WHERE projectId = ? ORDER BY createdAt DESC').all(projectId) as any[]).map(hydrateCommit)
   })
 
-  ipcMain.handle('create-commit', (_, data: any) => {
+  safeHandle('create-commit', (_, data: any) => {
     const id = crypto.randomUUID()
     const now = Date.now()
-    db.prepare(`
-      INSERT INTO project_commits (id, projectId, title, description, progressDelta, createdAt, updatedAt)
-      VALUES (?, ?, ?, ?, ?, ?, ?)
-    `).run(id, data.projectId, data.title, data.description || '', data.progressDelta || 0, now, now)
-    if (data.imagePath) {
-      db.prepare('INSERT INTO commit_images (id, commitId, imagePath, caption, sortIndex, createdAt) VALUES (?, ?, ?, ?, ?, ?)')
-        .run(crypto.randomUUID(), id, data.imagePath, '', 0, now)
-    }
-    db.prepare('UPDATE projects SET updatedAt = ? WHERE id = ?').run(now, data.projectId)
+
+    const createCommitTx = db.transaction(() => {
+      db.prepare(`
+        INSERT INTO project_commits (id, projectId, title, description, progressDelta, createdAt, updatedAt)
+        VALUES (?, ?, ?, ?, ?, ?, ?)
+      `).run(id, data.projectId, data.title, data.description || '', data.progressDelta || 0, now, now)
+      if (data.imagePath) {
+        db.prepare('INSERT INTO commit_images (id, commitId, imagePath, caption, sortIndex, createdAt) VALUES (?, ?, ?, ?, ?, ?)')
+          .run(crypto.randomUUID(), id, data.imagePath, '', 0, now)
+      }
+      db.prepare('UPDATE projects SET updatedAt = ? WHERE id = ?').run(now, data.projectId)
+    })
+    createCommitTx()
     return id
   })
 
-  ipcMain.handle('update-commit', (_, id: string, data: any) => {
+  safeHandle('update-commit', (_, id: string, data: any) => {
     const now = Date.now()
     const fields: string[] = []
     const values: any[] = []
@@ -250,14 +271,14 @@ export function setupIpcHandlers() {
     return true
   })
 
-  ipcMain.handle('delete-commit', (_, id: string) => {
+  safeHandle('delete-commit', (_, id: string) => {
     const commit = db.prepare('SELECT projectId FROM project_commits WHERE id = ?').get(id) as any
     db.prepare('DELETE FROM project_commits WHERE id = ?').run(id)
     if (commit) db.prepare('UPDATE projects SET updatedAt = ? WHERE id = ?').run(Date.now(), commit.projectId)
     return true
   })
 
-  ipcMain.handle('add-commit-image', (_, commitId: string, imagePath: string, caption = '') => {
+  safeHandle('add-commit-image', (_, commitId: string, imagePath: string, caption = '') => {
     const id = crypto.randomUUID()
     const now = Date.now()
     const maxSort = db.prepare('SELECT COALESCE(MAX(sortIndex), -1) AS maxSort FROM commit_images WHERE commitId = ?').get(commitId) as any
@@ -268,7 +289,7 @@ export function setupIpcHandlers() {
     return id
   })
 
-  ipcMain.handle('delete-commit-image', (_, id: string) => {
+  safeHandle('delete-commit-image', (_, id: string) => {
     const image = db.prepare(`
       SELECT pc.projectId FROM commit_images ci
       JOIN project_commits pc ON ci.commitId = pc.id
@@ -280,11 +301,11 @@ export function setupIpcHandlers() {
   })
 
   // --- Tags ---
-  ipcMain.handle('get-tags', () => {
+  safeHandle('get-tags', () => {
     return db.prepare('SELECT * FROM tags ORDER BY createdAt DESC').all()
   })
 
-  ipcMain.handle('create-tag', (_, data: any) => {
+  safeHandle('create-tag', (_, data: any) => {
     const id = crypto.randomUUID()
     const now = Date.now()
     db.prepare('INSERT INTO tags (id, name, color, createdAt) VALUES (?, ?, ?, ?)')
@@ -292,18 +313,18 @@ export function setupIpcHandlers() {
     return id
   })
 
-  ipcMain.handle('update-tag', (_, id: string, data: any) => {
+  safeHandle('update-tag', (_, id: string, data: any) => {
     db.prepare('UPDATE tags SET name = ?, color = ? WHERE id = ?').run(data.name, data.color, id)
     return true
   })
 
-  ipcMain.handle('delete-tag', (_, id: string) => {
+  safeHandle('delete-tag', (_, id: string) => {
     db.prepare('DELETE FROM tags WHERE id = ?').run(id)
     return true
   })
 
   // --- NoteBlocks ---
-  ipcMain.handle('create-noteblock', (_, projectId: string, content: string) => {
+  safeHandle('create-noteblock', (_, projectId: string, content: string) => {
     const id = crypto.randomUUID()
     const now = Date.now()
     db.prepare('INSERT INTO noteblocks (id, projectId, content, createdAt, updatedAt) VALUES (?, ?, ?, ?, ?)')
@@ -311,19 +332,19 @@ export function setupIpcHandlers() {
     return id
   })
 
-  ipcMain.handle('update-noteblock', (_, id: string, content: string) => {
+  safeHandle('update-noteblock', (_, id: string, content: string) => {
     const now = Date.now()
     db.prepare('UPDATE noteblocks SET content = ?, updatedAt = ? WHERE id = ?').run(content, now, id)
     return true
   })
 
-  ipcMain.handle('delete-noteblock', (_, id: string) => {
+  safeHandle('delete-noteblock', (_, id: string) => {
     db.prepare('DELETE FROM noteblocks WHERE id = ?').run(id)
     return true
   })
 
   // --- Todos ---
-  ipcMain.handle('create-todo', (_, projectId: string, content: string) => {
+  safeHandle('create-todo', (_, projectId: string, content: string) => {
     const id = crypto.randomUUID()
     const now = Date.now()
     db.prepare('INSERT INTO todos (id, projectId, content, completed, createdAt, updatedAt) VALUES (?, ?, ?, ?, ?, ?)')
@@ -331,7 +352,7 @@ export function setupIpcHandlers() {
     return id
   })
 
-  ipcMain.handle('update-todo', (_, id: string, data: any) => {
+  safeHandle('update-todo', (_, id: string, data: any) => {
     const now = Date.now()
     if (data.content !== undefined && data.completed !== undefined) {
       db.prepare('UPDATE todos SET content = ?, completed = ?, updatedAt = ? WHERE id = ?').run(data.content, data.completed ? 1 : 0, now, id)
@@ -343,7 +364,7 @@ export function setupIpcHandlers() {
     return true
   })
 
-  ipcMain.handle('delete-todo', (_, id: string) => {
+  safeHandle('delete-todo', (_, id: string) => {
     db.prepare('DELETE FROM todos WHERE id = ?').run(id)
     return true
   })

@@ -106,6 +106,20 @@ db.exec(`
     createdAt INTEGER NOT NULL,
     FOREIGN KEY(commitId) REFERENCES project_commits(id) ON DELETE CASCADE
   );
+
+  -- 迁移版本追踪
+  CREATE TABLE IF NOT EXISTS _migrations (
+    key TEXT PRIMARY KEY,
+    appliedAt INTEGER NOT NULL
+  );
+
+  -- 常用查询索引
+  CREATE INDEX IF NOT EXISTS idx_project_commits_projectId ON project_commits(projectId);
+  CREATE INDEX IF NOT EXISTS idx_commit_images_commitId ON commit_images(commitId);
+  CREATE INDEX IF NOT EXISTS idx_projects_status ON projects(status);
+  CREATE INDEX IF NOT EXISTS idx_project_tags_tagId ON project_tags(tagId);
+  CREATE INDEX IF NOT EXISTS idx_noteblocks_projectId ON noteblocks(projectId);
+  CREATE INDEX IF NOT EXISTS idx_todos_projectId ON todos(projectId);
 `)
 
 const defaultStatuses = [
@@ -134,22 +148,34 @@ if (existingStatusCount.count === 0) {
   seedStatuses()
 }
 
-const legacyStatusMap: Record<string, string> = {
-  developing: 'status-developing',
-  completed: 'status-completed',
-  paused: 'status-paused',
+// 旧版状态字符串迁移 — 仅执行一次
+function hasMigration(key: string): boolean {
+  return !!(db.prepare('SELECT 1 FROM _migrations WHERE key = ?').get(key))
 }
 
-const statusIds = new Set((db.prepare('SELECT id FROM project_statuses').all() as any[]).map(row => row.id))
-const projects = db.prepare('SELECT id, status FROM projects').all() as any[]
-const migrateStatuses = db.transaction(() => {
-  for (const project of projects) {
-    const nextStatus = legacyStatusMap[project.status] || (statusIds.has(project.status) ? project.status : 'status-developing')
-    if (nextStatus !== project.status) {
-      db.prepare('UPDATE projects SET status = ?, updatedAt = ? WHERE id = ?').run(nextStatus, Date.now(), project.id)
-    }
+function markMigration(key: string) {
+  db.prepare('INSERT OR IGNORE INTO _migrations (key, appliedAt) VALUES (?, ?)').run(key, Date.now())
+}
+
+if (!hasMigration('legacy_status_to_id')) {
+  const legacyStatusMap: Record<string, string> = {
+    developing: 'status-developing',
+    completed: 'status-completed',
+    paused: 'status-paused',
   }
-})
-migrateStatuses()
+
+  const statusIds = new Set((db.prepare('SELECT id FROM project_statuses').all() as any[]).map(row => row.id))
+  const projects = db.prepare('SELECT id, status FROM projects').all() as any[]
+  const migrateStatuses = db.transaction(() => {
+    for (const project of projects) {
+      const nextStatus = legacyStatusMap[project.status] || (statusIds.has(project.status) ? project.status : 'status-developing')
+      if (nextStatus !== project.status) {
+        db.prepare('UPDATE projects SET status = ?, updatedAt = ? WHERE id = ?').run(nextStatus, Date.now(), project.id)
+      }
+    }
+    markMigration('legacy_status_to_id')
+  })
+  migrateStatuses()
+}
 
 export default db

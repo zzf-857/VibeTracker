@@ -16,10 +16,13 @@ function createWindow() {
   win = new BrowserWindow({
     width: 1440,
     height: 900,
+    minWidth: 960,
+    minHeight: 640,
     webPreferences: {
       preload: path.join(__dirname, 'preload.js'),
       nodeIntegration: false,
-      contextIsolation: true
+      contextIsolation: true,
+      sandbox: true,
     },
   })
   
@@ -31,7 +34,6 @@ function createWindow() {
     win.webContents.openDevTools()
   } else {
     win.loadFile(path.join(RENDERER_DIST, 'index.html'))
-    win.webContents.openDevTools()
   }
 }
 
