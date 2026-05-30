@@ -539,20 +539,22 @@ export function ProjectDetail() {
             </div>
           </div>
 
-          <div className="relative pl-7 space-y-5 overflow-y-auto max-h-[540px] pr-2 custom-scrollbar before:absolute before:left-[7px] before:top-2 before:bottom-2 before:w-[2px] before:bg-border-primary">
-            {commits.map((commit) => (
-              <CommitCard
-                key={commit.id}
-                commit={commit}
-                onEdit={() => setEditingCommit(commit)}
-                onDelete={() => setPendingDeleteCommitId(commit.id)}
-                onSetCover={(imagePath) => setCoverFromPath(imagePath)}
-                isNew={commit.id === ritualCommitId}
-              />
-            ))}
-            {commits.length === 0 && (
-              <div className="min-h-[220px] flex items-center justify-center text-text-tertiary text-sm">还没有提交，先写下第一条进展。</div>
-            )}
+          <div className="overflow-y-auto max-h-[540px] pr-2 custom-scrollbar">
+            <div className="relative pl-7 space-y-5 before:absolute before:left-[7px] before:top-2 before:bottom-2 before:w-[2px] before:bg-border-primary">
+              {commits.map((commit) => (
+                <CommitCard
+                  key={commit.id}
+                  commit={commit}
+                  onEdit={() => setEditingCommit(commit)}
+                  onDelete={() => setPendingDeleteCommitId(commit.id)}
+                  onSetCover={(imagePath) => setCoverFromPath(imagePath)}
+                  isNew={commit.id === ritualCommitId}
+                />
+              ))}
+              {commits.length === 0 && (
+                <div className="min-h-[220px] flex items-center justify-center text-text-tertiary text-sm">还没有提交，先写下第一条进展。</div>
+              )}
+            </div>
           </div>
         </div>
 
