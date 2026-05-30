@@ -334,6 +334,7 @@ function EmptyState({ text, compact = false }: { text: string; compact?: boolean
 
 function MiniHeatmap({ commits }: { commits: ProjectCommit[] }) {
   const counts = useMemo(() => groupCommitsByDay(commits), [commits])
+
   const days = useMemo(() => {
     return Array.from({ length: 56 }).map((_, index) => {
       const date = new Date()
@@ -343,6 +344,15 @@ function MiniHeatmap({ commits }: { commits: ProjectCommit[] }) {
       return { key, count, level: getActivityLevel(count) }
     })
   }, [counts])
+
+  if (commits.length === 0) {
+    return (
+      <div className="flex flex-col items-center justify-center py-6 text-center text-xs text-text-tertiary">
+        <span className="mb-2 opacity-60">📊 暂无活跃度数据</span>
+        <span>添加您的第一次提交后，此处将点亮您的活跃热力图。</span>
+      </div>
+    )
+  }
 
   return (
     <div className="grid grid-cols-14 gap-1.5 w-full">
