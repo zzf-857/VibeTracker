@@ -355,7 +355,7 @@ function MiniHeatmap({ commits }: { commits: ProjectCommit[] }) {
   }
 
   return (
-    <div className="grid grid-cols-14 gap-1.5 w-full items-start">
+    <div className="grid gap-1.5 w-full items-start" style={{ gridTemplateColumns: 'repeat(14, minmax(0, 1fr))' }}>
       {days.map(day => {
         const className = ['bg-bg-tertiary', 'bg-status-level-1', 'bg-status-level-2', 'bg-status-level-3', 'bg-status-level-4'][day.level]
         return (
