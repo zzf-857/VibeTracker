@@ -9,6 +9,8 @@ import { formatDateTime, getProjectCover, getRecentCommit } from '../lib/project
 import { MOCK_MODE_LABEL, mockProjects, mockStatuses, mockTags } from '../lib/mockData'
 import { Skeleton } from '../components/Skeleton'
 import { useStore } from '../lib/store'
+import { InteractiveCard } from '../components/InteractiveCard'
+
 
 
 function ProjectListSkeleton() {
@@ -298,9 +300,9 @@ function ProjectGalleryCard({ project, onOpen, index }: { project: Project; onOp
   const recentCommit = getRecentCommit(project)
 
   return (
-    <button
+    <InteractiveCard
       onClick={onOpen}
-      className="group text-left glass-panel ambient-panel motion-card gallery-card gallery-card-enter rounded-[30px] overflow-hidden min-h-[360px] flex flex-col"
+      className="group text-left glass-panel ambient-panel motion-card gallery-card gallery-card-enter rounded-[30px] overflow-hidden min-h-[360px] flex flex-col cursor-pointer"
       style={getStaggerStyle(index + 2)}
     >
       {cover ? (
@@ -346,6 +348,6 @@ function ProjectGalleryCard({ project, onOpen, index }: { project: Project; onOp
           </div>
         </div>
       </div>
-    </button>
+    </InteractiveCard>
   )
 }

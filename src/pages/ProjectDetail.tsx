@@ -10,6 +10,10 @@ import { MOCK_MODE_LABEL, getMockProject, isMockProjectId, mockStatuses } from '
 import { Skeleton } from '../components/Skeleton'
 import { ConfirmDialog } from '../components/ConfirmDialog'
 import { useStore } from '../lib/store'
+import { useParticleEmitter } from '../components/ParticleEmitter'
+import { useTooltip } from '../components/CustomTooltip'
+import { cn } from '../lib/utils'
+
 
 
 function ProjectDetailSkeleton() {
@@ -86,6 +90,9 @@ export function ProjectDetail() {
   const { id } = useParams<{ id: string }>()
   const navigate = useNavigate()
   const { refresh } = useStore()
+  const { triggerConfetti, triggerTodoBurst } = useParticleEmitter()
+  const [deletingNoteIds, setDeletingNoteIds] = useState<string[]>([])
+  const [deletingTodoIds, setDeletingTodoIds] = useState<string[]>([])
   const [project, setProject] = useState<Project | null>(null)
   const [statuses, setStatuses] = useState<ProjectStatus[]>([])
   const [isLoading, setIsLoading] = useState(true)
@@ -189,7 +196,7 @@ export function ProjectDetail() {
     }, 1000)
   }
 
-  const createCommit = async () => {
+  const createCommit = async (e?: React.MouseEvent) => {
     if (!project || !commitTitle.trim() || creatingCommitRef.current) return
     if (isMock) return
     creatingCommitRef.current = true
@@ -204,6 +211,7 @@ export function ProjectDetail() {
         imagePath,
       })
       if (!isMountedRef.current) return
+      if (e) triggerConfetti(e.clientX, e.clientY)
       const now = Date.now()
       clearRitualTimeout()
       setRitualCommitId(createdId)
@@ -302,9 +310,13 @@ export function ProjectDetail() {
 
   const deleteNoteBlock = async (noteId: string) => {
     if (!project || isMock) return
-    await window.ipcRenderer.invoke('delete-noteblock', noteId)
-    if (!isMountedRef.current) return
-    loadData()
+    setDeletingNoteIds(prev => [...prev, noteId])
+    setTimeout(async () => {
+      await window.ipcRenderer.invoke('delete-noteblock', noteId)
+      if (!isMountedRef.current) return
+      setDeletingNoteIds(prev => prev.filter(id => id !== noteId))
+      loadData()
+    }, 280)
   }
 
   const createTodo = async () => {
@@ -315,8 +327,11 @@ export function ProjectDetail() {
     loadData()
   }
 
-  const toggleTodo = async (todo: Todo) => {
+  const toggleTodo = async (todo: Todo, e?: React.MouseEvent) => {
     if (!project || isMock) return
+    if (todo.completed === 0 && e) {
+      triggerTodoBurst(e.clientX, e.clientY)
+    }
     await window.ipcRenderer.invoke('update-todo', todo.id, { completed: todo.completed === 1 ? 0 : 1 })
     if (!isMountedRef.current) return
     loadData()
@@ -324,9 +339,13 @@ export function ProjectDetail() {
 
   const deleteTodo = async (todoId: string) => {
     if (!project || isMock) return
-    await window.ipcRenderer.invoke('delete-todo', todoId)
-    if (!isMountedRef.current) return
-    loadData()
+    setDeletingTodoIds(prev => [...prev, todoId])
+    setTimeout(async () => {
+      await window.ipcRenderer.invoke('delete-todo', todoId)
+      if (!isMountedRef.current) return
+      setDeletingTodoIds(prev => prev.filter(id => id !== todoId))
+      loadData()
+    }, 280)
   }
 
   if (isLoading) return <ProjectDetailSkeleton />
@@ -533,7 +552,7 @@ export function ProjectDetail() {
                 <ImagePlus size={15} /> 选择截图
               </button>
               {commitImagePath && <span className="text-xs text-text-tertiary truncate flex-1 font-mono">{commitImagePath}</span>}
-              <button onClick={createCommit} disabled={isMockProjectId(project.id) || isCreatingCommit || !commitTitle.trim()} className="motion-press ml-auto bg-text-primary text-primary rounded-full px-4 py-2 text-sm font-semibold flex items-center gap-2 transition-opacity hover:opacity-90 disabled:opacity-40">
+              <button onClick={(e) => createCommit(e)} disabled={isMockProjectId(project.id) || isCreatingCommit || !commitTitle.trim()} className="motion-press ml-auto bg-text-primary text-primary rounded-full px-4 py-2 text-sm font-semibold flex items-center gap-2 transition-opacity hover:opacity-90 disabled:opacity-40">
                 <Plus size={15} /> {isMockProjectId(project.id) ? '展示中' : isCreatingCommit ? '提交中' : '提交'}
               </button>
             </div>
@@ -606,7 +625,7 @@ export function ProjectDetail() {
           )}
           <div className="space-y-3 overflow-y-auto max-h-[400px] pr-1 custom-scrollbar flex-1">
             {noteblocks.map(note => (
-              <div key={note.id} className="bg-bg-secondary border border-border-subtle rounded-2xl p-4 group">
+              <div key={note.id} className={cn("bg-bg-secondary border border-border-subtle rounded-2xl p-4 group item-exit-transition", deletingNoteIds.includes(note.id) && "item-exit-active")}>
                 {editingNoteId === note.id ? (
                   <div>
                     <textarea
@@ -678,9 +697,9 @@ export function ProjectDetail() {
           )}
           <div className="space-y-2 overflow-y-auto max-h-[400px] pr-1 custom-scrollbar flex-1">
             {todos.map(todo => (
-              <div key={todo.id} className="flex items-center gap-3 bg-bg-secondary border border-border-subtle rounded-2xl px-4 py-3 group transition-colors hover:bg-bg-tertiary">
+              <div key={todo.id} className={cn("flex items-center gap-3 bg-bg-secondary border border-border-subtle rounded-2xl px-4 py-3 group transition-colors hover:bg-bg-tertiary item-exit-transition", deletingTodoIds.includes(todo.id) && "item-exit-active")}>
                 <button
-                  onClick={() => toggleTodo(todo)}
+                  onClick={(e) => toggleTodo(todo, e)}
                   disabled={isMock}
                   className={`flex-shrink-0 transition-colors ${todo.completed ? 'text-status-completed' : 'text-text-tertiary hover:text-text-secondary'}`}
                 >
@@ -809,6 +828,17 @@ function CommitEditor({
   const [images, setImages] = useState<CommitImage[]>(commit.images || [])
   const [caption, setCaption] = useState('')
   const [pendingDeleteImageId, setPendingDeleteImageId] = useState<string | null>(null)
+  const [isActive, setIsActive] = useState(false)
+
+  useEffect(() => {
+    const timer = setTimeout(() => setIsActive(true), 25)
+    return () => clearTimeout(timer)
+  }, [])
+
+  const handleClose = () => {
+    setIsActive(false)
+    setTimeout(onClose, 380)
+  }
 
   const save = async () => {
     if (!title.trim()) return
@@ -817,7 +847,8 @@ function CommitEditor({
       description: description.trim(),
       progressDelta: Number(progressDelta) || 0,
     })
-    onSaved()
+    setIsActive(false)
+    setTimeout(onSaved, 380)
   }
 
   const addImage = async () => {
@@ -835,11 +866,16 @@ function CommitEditor({
   }
 
   return (
-    <div className="fixed inset-0 z-50 bg-black/40 backdrop-blur-sm flex justify-end editor-backdrop">
-      <aside className="editor-panel w-[500px] h-full bg-[#111318] border-l border-border-primary p-6 shadow-2xl overflow-y-auto custom-scrollbar">
+    <div
+      className={cn("fixed inset-0 z-50 flex justify-end editor-backdrop", isActive && "editor-backdrop-active")}
+      onClick={(e) => {
+        if (e.target === e.currentTarget) handleClose()
+      }}
+    >
+      <aside className={cn("editor-panel w-[500px] h-full bg-[#111318] border-l border-border-primary p-6 shadow-2xl overflow-y-auto custom-scrollbar", isActive && "editor-panel-active")}>
         <div className="flex items-center justify-between mb-6">
           <h2 className="text-xl font-semibold">编辑提交</h2>
-          <button onClick={onClose} className="motion-action text-text-tertiary hover:text-text-primary"><X size={18} /></button>
+          <button onClick={handleClose} className="motion-action text-text-tertiary hover:text-text-primary"><X size={18} /></button>
         </div>
         <div className="space-y-4">
           <input value={title} onChange={e => setTitle(e.target.value)} className="motion-focus w-full bg-bg-secondary border border-border-subtle rounded-2xl px-4 py-3 text-sm outline-none" />
@@ -909,6 +945,7 @@ function CommitEditor({
 
 function CommitHeatmap({ commits, pulseTimestamp }: { commits: ProjectCommit[]; pulseTimestamp?: number }) {
   const counts = useMemo(() => groupCommitsByDay(commits), [commits])
+  const { showTooltip, hideTooltip } = useTooltip()
   const pulseKey = pulseTimestamp ? formatDateKey(pulseTimestamp) : ''
   const days = useMemo(() => {
     return Array.from({ length: 70 }).map((_, index) => {
@@ -924,7 +961,23 @@ function CommitHeatmap({ commits, pulseTimestamp }: { commits: ProjectCommit[]; 
     <div className="grid gap-1 items-start" style={{ gridTemplateColumns: 'repeat(14, minmax(0, 1fr))' }}>
       {days.map(day => {
         const className = ['bg-bg-tertiary', 'bg-status-level-1', 'bg-status-level-2', 'bg-status-level-3', 'bg-status-level-4'][day.level]
-        return <div key={`${day.key}:${day.key === pulseKey ? pulseTimestamp : 'stable'}`} title={`${day.key}: ${day.count} 次提交`} className={`w-full aspect-square h-auto rounded-[5px] transition-all duration-200 hover:scale-110 ${className} ${day.key === pulseKey ? 'heatmap-pulse' : ''}`} />
+        return (
+          <div
+            key={`${day.key}:${day.key === pulseKey ? pulseTimestamp : 'stable'}`}
+            onMouseMove={(e) => showTooltip(
+              <div className="flex flex-col gap-0.5">
+                <span className="font-semibold text-[10px] text-text-tertiary">{day.key}</span>
+                <span className="flex items-center gap-1.5 text-xs text-text-primary">
+                  <span className="w-1.5 h-1.5 rounded-full" style={{ backgroundColor: day.level > 0 ? '#63D693' : '#707A8A' }} />
+                  <strong>{day.count}</strong> 次进展提交
+                </span>
+              </div>,
+              e
+            )}
+            onMouseLeave={hideTooltip}
+            className={`w-full aspect-square h-auto rounded-[5px] transition-all duration-200 hover:scale-110 cursor-crosshair ${className} ${day.key === pulseKey ? 'heatmap-pulse' : ''}`}
+          />
+        )
       })}
     </div>
   )

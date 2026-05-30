@@ -8,6 +8,9 @@ import { formatDateKey, formatDateTime, getActivityLevel, getProjectCover, getRe
 import { MOCK_MODE_LABEL, mockCommits, mockProjects, mockStatuses } from '../lib/mockData'
 import { Skeleton } from '../components/Skeleton'
 import { useStore } from '../lib/store'
+import { InteractiveCard } from '../components/InteractiveCard'
+import { useTooltip } from '../components/CustomTooltip'
+
 
 
 function DashboardSkeleton() {
@@ -177,7 +180,7 @@ export function Dashboard() {
           </div>
           <div className="grid grid-cols-2 gap-4">
             {displayProjects.slice(0, 6).map(project => (
-              <button key={project.id} onClick={() => navigate(`/project/${project.id}`)} className="dashboard-project-card motion-card group text-left bg-bg-secondary border border-border-subtle rounded-[24px] overflow-hidden min-h-[210px]">
+              <InteractiveCard key={project.id} onClick={() => navigate(`/project/${project.id}`)} className="dashboard-project-card motion-card group text-left bg-bg-secondary border border-border-subtle rounded-[24px] overflow-hidden min-h-[210px] cursor-pointer">
                 <div className="h-24 bg-bg-tertiary overflow-hidden">
                   {getProjectCover(project) ? (
                     <SafeImage src={getProjectCover(project)} alt={`${project.name} 封面`} className="w-full h-full object-cover gallery-cover" />
@@ -194,7 +197,7 @@ export function Dashboard() {
                   </div>
                   <p className="text-xs text-text-secondary mt-3 truncate">{getRecentCommit(project)?.title || project.description || '等待第一次提交'}</p>
                 </div>
-              </button>
+              </InteractiveCard>
             ))}
           </div>
           {displayProjects.length === 0 && (
@@ -334,6 +337,7 @@ function EmptyState({ text, compact = false }: { text: string; compact?: boolean
 
 function MiniHeatmap({ commits }: { commits: ProjectCommit[] }) {
   const counts = useMemo(() => groupCommitsByDay(commits), [commits])
+  const { showTooltip, hideTooltip } = useTooltip()
 
   const days = useMemo(() => {
     return Array.from({ length: 56 }).map((_, index) => {
@@ -361,8 +365,18 @@ function MiniHeatmap({ commits }: { commits: ProjectCommit[] }) {
         return (
           <div
             key={day.key}
-            title={`${day.key}: ${day.count} 次提交`}
-            className={`w-full aspect-square h-auto rounded-[4px] transition-all duration-200 hover:scale-110 ${className}`}
+            onMouseMove={(e) => showTooltip(
+              <div className="flex flex-col gap-0.5">
+                <span className="font-semibold text-[10px] text-text-tertiary">{day.key}</span>
+                <span className="flex items-center gap-1.5 text-xs text-text-primary">
+                  <span className="w-1.5 h-1.5 rounded-full" style={{ backgroundColor: day.level > 0 ? '#63D693' : '#707A8A' }} />
+                  <strong>{day.count}</strong> 次进展提交
+                </span>
+              </div>,
+              e
+            )}
+            onMouseLeave={hideTooltip}
+            className={`w-full aspect-square h-auto rounded-[4px] transition-all duration-200 hover:scale-110 cursor-crosshair ${className}`}
           />
         )
       })}

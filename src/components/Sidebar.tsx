@@ -1,3 +1,4 @@
+import { useEffect, useState } from 'react'
 import { NavLink, useLocation } from 'react-router-dom'
 import { LayoutDashboard, FolderKanban, Tags, Settings } from 'lucide-react'
 import { cn } from '../lib/utils'
@@ -13,6 +14,21 @@ export function Sidebar() {
   const activeIndex = navItems.findIndex(item => item.match(location.pathname))
   const indicatorIndex = Math.max(0, activeIndex)
 
+  const [prevIndex, setPrevIndex] = useState(indicatorIndex)
+  const [isNavigating, setIsNavigating] = useState(false)
+  const [clickActivePath, setClickActivePath] = useState<string | null>(null)
+
+  useEffect(() => {
+    if (indicatorIndex !== prevIndex) {
+      setIsNavigating(true)
+      const timer = setTimeout(() => {
+        setIsNavigating(false)
+        setPrevIndex(indicatorIndex)
+      }, 380)
+      return () => clearTimeout(timer)
+    }
+  }, [indicatorIndex, prevIndex])
+
   return (
     <aside className="w-[92px] h-full bg-sidebar/80 backdrop-blur-2xl flex flex-col py-6 px-4 flex-shrink-0 relative z-10 border-r border-border-primary">
       <div className="flex items-center justify-center mb-9">
@@ -24,8 +40,15 @@ export function Sidebar() {
       <nav className="relative flex flex-col gap-3 items-center">
         <span
           aria-hidden="true"
-          className="sidebar-active-indicator"
-          style={{ opacity: activeIndex >= 0 ? 1 : 0, transform: `translateY(${indicatorIndex * 60}px)` }}
+          className={cn(
+            'sidebar-active-indicator',
+            isNavigating && 'sidebar-active-indicator-stretch sidebar-active-indicator-bounce'
+          )}
+          style={{
+            opacity: activeIndex >= 0 ? 1 : 0,
+            '--indicator-y': `${indicatorIndex * 60}px`,
+            transform: isNavigating ? undefined : `translateY(${indicatorIndex * 60}px)`,
+          } as React.CSSProperties}
         />
         {navItems.map((item) => {
           const Icon = item.icon
@@ -33,13 +56,18 @@ export function Sidebar() {
             <NavLink
               key={item.path}
               to={item.path}
+              onClick={() => {
+                setClickActivePath(item.path)
+                setTimeout(() => setClickActivePath(null), 450)
+              }}
               className={({ isActive }) => {
                 const isCurrent = isActive || item.match(location.pathname)
                 return cn(
                   'sidebar-nav-item relative z-10 w-12 h-12 flex items-center justify-center rounded-2xl group',
                   isCurrent
                     ? 'bg-bg-tertiary text-text-primary shadow-[0_14px_38px_rgba(0,0,0,0.18)] scale-[1.03]'
-                    : 'text-text-secondary hover:bg-bg-secondary hover:text-text-primary hover:scale-[1.03]'
+                    : 'text-text-secondary hover:bg-bg-secondary hover:text-text-primary hover:scale-[1.03]',
+                  clickActivePath === item.path && 'sidebar-nav-item-active-click'
                 )
               }}
               title={item.label}
@@ -56,3 +84,4 @@ export function Sidebar() {
     </aside>
   )
 }
+

@@ -853,3 +853,100 @@ body {
 .animate-fade-in {
   animation: fadeInPreview 0.22s cubic-bezier(0.2, 0, 0, 1) forwards;
 }
+
+/* --- Premium Interactive & Animation System --- */
+
+/* Card Sheen effect */
+.card-sheen {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  z-index: 10;
+  border-radius: inherit;
+  background: radial-gradient(
+    circle 160px at var(--sheen-x, 50%) var(--sheen-y, 50%),
+    rgba(255, 255, 255, 0.08) 0%,
+    rgba(255, 255, 255, 0.025) 50%,
+    transparent 100%
+  );
+  opacity: 0;
+  transition: opacity 0.3s ease;
+}
+.group:hover .card-sheen,
+.motion-card:hover .card-sheen,
+.dashboard-project-card:hover .card-sheen,
+.gallery-card:hover .card-sheen {
+  opacity: 1;
+}
+
+/* Sidebar dynamic jelly indicator classes */
+.sidebar-active-indicator-stretch {
+  transform: translateY(var(--indicator-y, 0px)) scaleY(1.15) scaleX(0.92) !important;
+}
+.sidebar-active-indicator-bounce {
+  animation: activeIndicatorBounce 0.38s cubic-bezier(0.25, 0.46, 0.45, 0.94) both;
+}
+@keyframes activeIndicatorBounce {
+  0% { transform: translateY(var(--indicator-y, 0px)) scaleY(1.15) scaleX(0.92); }
+  50% { transform: translateY(var(--indicator-y, 0px)) scaleY(0.93) scaleX(1.06); }
+  100% { transform: translateY(var(--indicator-y, 0px)) scaleY(1) scaleX(1); }
+}
+
+/* Sidebar Nav Item bounce micro-interaction */
+.sidebar-nav-item:active svg {
+  transform: scale(0.85);
+}
+.sidebar-nav-item-active-click svg {
+  animation: sidebarIconClick 0.42s cubic-bezier(0.175, 0.885, 0.32, 1.275) both;
+}
+@keyframes sidebarIconClick {
+  0% { transform: scale(1); }
+  32% { transform: scale(0.76); }
+  70% { transform: scale(1.15); }
+  100% { transform: scale(1); }
+}
+
+/* Organic slide-out delete exit transition classes */
+.item-exit-transition {
+  transition: max-height 0.28s cubic-bezier(0.16, 1, 0.3, 1), 
+              opacity 0.24s cubic-bezier(0.16, 1, 0.3, 1), 
+              transform 0.24s cubic-bezier(0.16, 1, 0.3, 1), 
+              margin 0.28s cubic-bezier(0.16, 1, 0.3, 1), 
+              padding 0.28s cubic-bezier(0.16, 1, 0.3, 1),
+              border-width 0.28s cubic-bezier(0.16, 1, 0.3, 1);
+  will-change: max-height, opacity, transform;
+}
+.item-exit-active {
+  max-height: 0 !important;
+  opacity: 0 !important;
+  transform: translateY(-10px) scale(0.96) !important;
+  margin-top: 0 !important;
+  margin-bottom: 0 !important;
+  padding-top: 0 !important;
+  padding-bottom: 0 !important;
+  border-top-width: 0 !important;
+  border-bottom-width: 0 !important;
+  overflow: hidden !important;
+}
+
+/* Premium smooth Apple-like cubic-bezier drawer & modals overrides */
+.editor-backdrop {
+  backdrop-filter: blur(0px);
+  background-color: rgba(0, 0, 0, 0);
+  transition: backdrop-filter 0.38s cubic-bezier(0.16, 1, 0.3, 1), background-color 0.38s cubic-bezier(0.16, 1, 0.3, 1) !important;
+  animation: none !important;
+}
+.editor-backdrop-active {
+  backdrop-filter: blur(14px) !important;
+  background-color: rgba(0, 0, 0, 0.45) !important;
+}
+.editor-panel {
+  transform: translateX(100%);
+  transition: transform 0.38s cubic-bezier(0.16, 1, 0.3, 1) !important;
+  will-change: transform;
+  animation: none !important;
+}
+.editor-panel-active {
+  transform: translateX(0) !important;
+}
+
