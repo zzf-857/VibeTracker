@@ -6,12 +6,85 @@ import { AnimatedPage } from '../components/AnimatedPage'
 import { SafeImage } from '../components/SafeImage'
 import { formatDateKey, formatDateTime, getActivityLevel, getProjectCover, groupCommitsByDay } from '../lib/projectView'
 import { MOCK_MODE_LABEL, getMockProject, isMockProjectId, mockStatuses } from '../lib/mockData'
+import { Skeleton } from '../components/Skeleton'
+import { ConfirmDialog } from '../components/ConfirmDialog'
+
+function ProjectDetailSkeleton() {
+  return (
+    <div className="flex flex-col min-h-full w-full py-8 px-10 gap-7 animate-pulse">
+      {/* 返回按钮 */}
+      <Skeleton className="h-5 w-16 rounded" />
+      
+      {/* 头部项目面板 */}
+      <div className="glass-panel rounded-[32px] p-8 flex gap-8">
+        {/* 左侧封面骨架 */}
+        <Skeleton className="w-[200px] h-[135px] rounded-[24px] flex-shrink-0" />
+        {/* 右侧文本骨架 */}
+        <div className="flex-1 flex flex-col justify-between py-1">
+          <div className="space-y-3">
+            <div className="flex justify-between items-center">
+              <Skeleton className="h-8 w-48 rounded-lg" />
+              <div className="flex gap-2">
+                <Skeleton className="h-8 w-16 rounded-full" />
+                <Skeleton className="h-8 w-8 rounded-full" />
+                <Skeleton className="h-8 w-8 rounded-full" />
+              </div>
+            </div>
+            <Skeleton className="h-4.5 w-full rounded" />
+            <Skeleton className="h-4.5 w-3/4 rounded" />
+          </div>
+          <div className="flex gap-4 mt-4">
+            <Skeleton className="h-5 w-36 rounded" />
+            <Skeleton className="h-5 w-36 rounded" />
+          </div>
+        </div>
+      </div>
+
+      {/* 进度/快捷提交区 */}
+      <div className="grid grid-cols-[1.4fr_0.6fr] gap-6">
+        <div className="glass-panel rounded-[32px] p-6 space-y-4">
+          <Skeleton className="h-6 w-32 rounded" />
+          <div className="flex items-center gap-6 h-28">
+            <Skeleton className="w-24 h-24 rounded-full" />
+            <div className="space-y-2 flex-1">
+              <Skeleton className="h-4.5 w-1/2 rounded" />
+              <Skeleton className="h-3.5 w-1/3 rounded" />
+            </div>
+          </div>
+        </div>
+        <div className="glass-panel rounded-[32px] p-6 flex flex-col justify-between">
+          <Skeleton className="h-6 w-24 rounded" />
+          <Skeleton className="h-10 w-full rounded-full" />
+        </div>
+      </div>
+
+      {/* NoteBlocks & Todos 区域 */}
+      <div className="grid grid-cols-2 gap-6">
+        <div className="glass-panel rounded-[32px] p-6 space-y-4 h-[300px]">
+          <Skeleton className="h-6 w-24 rounded" />
+          <div className="space-y-3">
+            <Skeleton className="h-16 w-full rounded-2xl" />
+            <Skeleton className="h-16 w-full rounded-2xl" />
+          </div>
+        </div>
+        <div className="glass-panel rounded-[32px] p-6 space-y-4 h-[300px]">
+          <Skeleton className="h-6 w-24 rounded" />
+          <div className="space-y-3">
+            <Skeleton className="h-10 w-full rounded-2xl" />
+            <Skeleton className="h-10 w-full rounded-2xl" />
+          </div>
+        </div>
+      </div>
+    </div>
+  )
+}
 
 export function ProjectDetail() {
   const { id } = useParams<{ id: string }>()
   const navigate = useNavigate()
   const [project, setProject] = useState<Project | null>(null)
   const [statuses, setStatuses] = useState<ProjectStatus[]>([])
+  const [isLoading, setIsLoading] = useState(true)
   const [commitTitle, setCommitTitle] = useState('')
   const [commitDescription, setCommitDescription] = useState('')
   const [progressDelta, setProgressDelta] = useState('')
@@ -30,6 +103,7 @@ export function ProjectDetail() {
   const [editNoteContent, setEditNoteContent] = useState('')
   // Todos
   const [newTodoContent, setNewTodoContent] = useState('')
+  const [pendingDeleteCommitId, setPendingDeleteCommitId] = useState<string | null>(null)
 
   const isMountedRef = useRef(true)
   const creatingCommitRef = useRef(false)
@@ -37,6 +111,7 @@ export function ProjectDetail() {
   const coverRitualTimeoutRef = useRef<number | null>(null)
 
   useEffect(() => {
+    setIsLoading(true)
     loadData()
   }, [id])
 
@@ -61,14 +136,20 @@ export function ProjectDetail() {
 
   const loadData = async () => {
     if (!id) return
-    const [p, s] = await Promise.all([
-      window.ipcRenderer.invoke('get-project', id),
-      window.ipcRenderer.invoke('get-statuses'),
-    ])
-    if (!isMountedRef.current) return
-    const mockProject = (!p || Array.isArray(p)) && isMockProjectId(id) ? getMockProject(id) : null
-    setProject(mockProject || p)
-    setStatuses(mockProject ? mockStatuses : s)
+    try {
+      const [p, s] = await Promise.all([
+        window.ipcRenderer.invoke('get-project', id),
+        window.ipcRenderer.invoke('get-statuses'),
+      ])
+      if (!isMountedRef.current) return
+      const mockProject = (!p || Array.isArray(p)) && isMockProjectId(id) ? getMockProject(id) : null
+      setProject(mockProject || p)
+      setStatuses(mockProject ? mockStatuses : s)
+    } catch (err) {
+      console.error('Failed to load project:', err)
+    } finally {
+      if (isMountedRef.current) setIsLoading(false)
+    }
   }
 
   const commits = project?.commits || []
@@ -242,7 +323,9 @@ export function ProjectDetail() {
     loadData()
   }
 
-  if (!project) return <div className="p-10 text-text-secondary">正在读取项目...</div>
+  if (isLoading) return <ProjectDetailSkeleton />
+
+  if (!project) return <div className="p-10 text-text-secondary">项目未找到或已被删除。</div>
 
   return (
     <AnimatedPage tone="detail" className="flex flex-col min-h-full w-full py-8 px-10 gap-7">
@@ -427,11 +510,7 @@ export function ProjectDetail() {
                 key={commit.id}
                 commit={commit}
                 onEdit={() => setEditingCommit(commit)}
-                onDelete={async () => {
-                  if (!confirm('删除这条提交？')) return
-                  await window.ipcRenderer.invoke('delete-commit', commit.id)
-                  loadData()
-                }}
+                onDelete={() => setPendingDeleteCommitId(commit.id)}
                 onSetCover={(imagePath) => setCoverFromPath(imagePath)}
                 isNew={commit.id === ritualCommitId}
               />
@@ -602,6 +681,20 @@ export function ProjectDetail() {
           onChanged={loadData}
         />
       )}
+
+      <ConfirmDialog
+        isOpen={pendingDeleteCommitId !== null}
+        title="删除提交"
+        message="确定要删除这条提交吗？此操作无法撤销。"
+        onConfirm={async () => {
+          if (pendingDeleteCommitId) {
+            await window.ipcRenderer.invoke('delete-commit', pendingDeleteCommitId)
+            setPendingDeleteCommitId(null)
+            loadData()
+          }
+        }}
+        onCancel={() => setPendingDeleteCommitId(null)}
+      />
     </AnimatedPage>
   )
 }
@@ -654,6 +747,7 @@ function CommitEditor({
   const [progressDelta, setProgressDelta] = useState(String(commit.progressDelta || ''))
   const [images, setImages] = useState<CommitImage[]>(commit.images || [])
   const [caption, setCaption] = useState('')
+  const [pendingDeleteImageId, setPendingDeleteImageId] = useState<string | null>(null)
 
   const save = async () => {
     if (!title.trim()) return
@@ -675,11 +769,8 @@ function CommitEditor({
     }
   }
 
-  const deleteImage = async (imageId: string) => {
-    if (!confirm('从这条提交中移除这张截图？')) return
-    await window.ipcRenderer.invoke('delete-commit-image', imageId)
-    setImages(prev => prev.filter(image => image.id !== imageId))
-    onChanged()
+  const deleteImage = (imageId: string) => {
+    setPendingDeleteImageId(imageId)
   }
 
   return (
@@ -736,6 +827,21 @@ function CommitEditor({
           <button onClick={save} disabled={!title.trim()} className="motion-action w-full bg-text-primary text-primary rounded-full px-4 py-3 text-sm font-semibold disabled:opacity-40">保存修改</button>
         </div>
       </aside>
+
+      <ConfirmDialog
+        isOpen={pendingDeleteImageId !== null}
+        title="移除截图"
+        message="确定要从这条提交中移除这张截图吗？"
+        onConfirm={async () => {
+          if (pendingDeleteImageId) {
+            await window.ipcRenderer.invoke('delete-commit-image', pendingDeleteImageId)
+            setImages(prev => prev.filter(image => image.id !== pendingDeleteImageId))
+            setPendingDeleteImageId(null)
+            onChanged()
+          }
+        }}
+        onCancel={() => setPendingDeleteImageId(null)}
+      />
     </div>
   )
 }

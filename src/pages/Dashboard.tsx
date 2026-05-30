@@ -6,11 +6,101 @@ import { AnimatedPage } from '../components/AnimatedPage'
 import { SafeImage } from '../components/SafeImage'
 import { formatDateKey, formatDateTime, getActivityLevel, getProjectCover, getRecentCommit, groupCommitsByDay } from '../lib/projectView'
 import { MOCK_MODE_LABEL, mockCommits, mockProjects, mockStatuses } from '../lib/mockData'
+import { Skeleton } from '../components/Skeleton'
+
+function DashboardSkeleton() {
+  return (
+    <div className="flex flex-col min-h-full w-full py-8 px-10 gap-8">
+      {/* 头部标题区 */}
+      <div className="flex items-end justify-between">
+        <div className="space-y-2 w-1/3">
+          <Skeleton className="h-4 w-24 rounded" />
+          <Skeleton className="h-10 w-48 rounded-lg" />
+          <Skeleton className="h-4 w-72 rounded mt-2" />
+        </div>
+        <Skeleton className="h-11 w-32 rounded-full" />
+      </div>
+
+      {/* 4个 StatCard */}
+      <div className="grid grid-cols-4 gap-5">
+        {[1, 2, 3, 4].map(i => (
+          <div key={i} className="glass-panel rounded-[24px] p-6 space-y-3">
+            <div className="flex items-center justify-between">
+              <Skeleton className="w-8 h-8 rounded-xl" />
+            </div>
+            <Skeleton className="h-4 w-16 rounded" />
+            <Skeleton className="h-8 w-20 rounded-md" />
+          </div>
+        ))}
+      </div>
+
+      {/* 左右分栏 */}
+      <div className="grid grid-cols-[1.25fr_0.75fr] gap-6 flex-1 min-h-[420px]">
+        {/* 左栏最近活跃项目 */}
+        <div className="glass-panel rounded-[30px] p-6">
+          <div className="flex justify-between items-center mb-6">
+            <div className="space-y-2 w-1/4">
+              <Skeleton className="h-5 w-32 rounded" />
+              <Skeleton className="h-4.5 w-24 rounded" />
+            </div>
+            <Skeleton className="h-4 w-16 rounded" />
+          </div>
+          <div className="grid grid-cols-2 gap-4">
+            {[1, 2, 3, 4].map(i => (
+              <div key={i} className="bg-bg-secondary border border-border-subtle rounded-[24px] overflow-hidden h-[210px] space-y-4">
+                <Skeleton className="h-24 w-full rounded-none" />
+                <div className="p-4 space-y-3">
+                  <div className="flex justify-between items-center">
+                    <Skeleton className="h-5 w-24 rounded" />
+                    <Skeleton className="h-5 w-12 rounded-full" />
+                  </div>
+                  <Skeleton className="h-4 w-full rounded" />
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+
+        {/* 右栏 */}
+        <div className="space-y-6">
+          {/* 近期提交流 */}
+          <div className="glass-panel rounded-[30px] p-6 space-y-4">
+            <Skeleton className="h-5 w-24 rounded" />
+            <div className="space-y-4">
+              {[1, 2, 3].map(i => (
+                <div key={i} className="border-l border-white/[0.06] pl-4 space-y-2">
+                  <Skeleton className="h-4 w-full rounded" />
+                  <Skeleton className="h-3.5 w-32 rounded" />
+                </div>
+              ))}
+            </div>
+          </div>
+          {/* 状态分布 */}
+          <div className="glass-panel rounded-[30px] p-6 space-y-4">
+            <Skeleton className="h-5 w-20 rounded" />
+            <div className="space-y-3">
+              {[1, 2, 3].map(i => (
+                <div key={i} className="flex justify-between items-center">
+                  <div className="flex items-center gap-2">
+                    <Skeleton className="w-2.5 h-2.5 rounded-full" />
+                    <Skeleton className="h-4 w-16 rounded" />
+                  </div>
+                  <Skeleton className="h-4 w-6 rounded" />
+                </div>
+              ))}
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  )
+}
 
 export function Dashboard() {
   const [projects, setProjects] = useState<Project[]>([])
   const [statuses, setStatuses] = useState<ProjectStatus[]>([])
   const [allCommits, setAllCommits] = useState<ProjectCommit[]>([])
+  const [isLoading, setIsLoading] = useState(true)
   const navigate = useNavigate()
 
   useEffect(() => {
@@ -22,13 +112,21 @@ export function Dashboard() {
       setStatuses(s)
       const commits = await Promise.all(p.map((project: Project) => window.ipcRenderer.invoke('get-commits', project.id)))
       setAllCommits(commits.flat())
+      setIsLoading(false)
+    }).catch(err => {
+      console.error('Failed to load dashboard:', err)
+      setIsLoading(false)
     })
   }, [])
 
-  const isMockMode = projects.length === 0
+  const isMockMode = !isLoading && projects.length === 0
   const displayProjects = isMockMode ? mockProjects : projects
   const displayStatuses = isMockMode ? mockStatuses : statuses
   const displayCommits = isMockMode ? mockCommits : allCommits
+
+  if (isLoading) {
+    return <DashboardSkeleton />
+  }
 
   const commits = useMemo(() => {
     return displayProjects

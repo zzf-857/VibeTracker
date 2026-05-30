@@ -3,11 +3,64 @@ import { AlertTriangle, ArrowDown, ArrowUp, Check, GripVertical, Palette, Plus, 
 import { AnimatedPage } from '../components/AnimatedPage'
 import { ProjectStatus } from '../types'
 import { validateStatusName } from '../lib/statusValidation'
+import { Skeleton } from '../components/Skeleton'
 
 const COLORS = ['#74A9FF', '#63D693', '#F3BB6C', '#B8A6FF', '#A8B0BD', '#FF6B6B']
 
+function SettingsSkeleton() {
+  return (
+    <div className="flex flex-col min-h-full w-full py-8 px-10 gap-8 animate-pulse">
+      {/* 头部 */}
+      <div>
+        <Skeleton className="h-4 w-24 rounded" />
+        <Skeleton className="h-9 w-32 rounded-lg mt-2" />
+        <Skeleton className="h-4.5 w-64 rounded mt-2" />
+      </div>
+
+      <div className="grid grid-cols-[1fr_360px] gap-6">
+        {/* 左侧状态列表骨架 */}
+        <div className="glass-panel rounded-[32px] p-6 space-y-6">
+          <div className="flex justify-between items-center">
+            <div className="space-y-2">
+              <Skeleton className="h-6 w-24 rounded" />
+              <Skeleton className="h-4 w-64 rounded" />
+            </div>
+            <Skeleton className="w-5 h-5 rounded-full" />
+          </div>
+          <div className="space-y-3">
+            {[1, 2, 3, 4].map(i => (
+              <div key={i} className="bg-bg-secondary border border-border-subtle rounded-[24px] p-4 flex items-center gap-4">
+                <Skeleton className="w-8 h-8 rounded-full" />
+                <Skeleton className="w-3 h-3 rounded-full" />
+                <Skeleton className="h-5 w-32 rounded flex-1" />
+                <Skeleton className="w-8 h-8 rounded-full" />
+                <Skeleton className="w-8 h-8 rounded-full" />
+              </div>
+            ))}
+          </div>
+        </div>
+
+        {/* 右侧创建状态骨架 */}
+        <div className="glass-panel rounded-[32px] p-6 space-y-6">
+          <Skeleton className="h-6 w-32 rounded" />
+          <div className="space-y-4">
+            <Skeleton className="h-10 w-full rounded-2xl" />
+            <div className="flex gap-2">
+              {[1, 2, 3, 4, 5, 6].map(i => (
+                <Skeleton key={i} className="w-6 h-6 rounded-full" />
+              ))}
+            </div>
+            <Skeleton className="h-10 w-full rounded-full" />
+          </div>
+        </div>
+      </div>
+    </div>
+  )
+}
+
 export function Settings() {
   const [statuses, setStatuses] = useState<ProjectStatus[]>([])
+  const [isLoading, setIsLoading] = useState(true)
   const [newName, setNewName] = useState('')
   const [newColor, setNewColor] = useState(COLORS[0])
   const [notice, setNotice] = useState('')
@@ -27,7 +80,14 @@ export function Settings() {
   }, [statuses])
 
   const loadStatuses = async () => {
-    setStatuses(await window.ipcRenderer.invoke('get-statuses'))
+    try {
+      const data = await window.ipcRenderer.invoke('get-statuses')
+      setStatuses(data)
+    } catch (err) {
+      console.error('Failed to load statuses:', err)
+    } finally {
+      setIsLoading(false)
+    }
   }
 
   const createStatus = async () => {
@@ -126,6 +186,10 @@ export function Settings() {
       setIsSavingOrder(false)
       dragStartOrderRef.current = []
     }
+  }
+
+  if (isLoading) {
+    return <SettingsSkeleton />
   }
 
   return (

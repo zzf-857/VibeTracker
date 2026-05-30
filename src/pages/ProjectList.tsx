@@ -7,11 +7,68 @@ import { SafeImage } from '../components/SafeImage'
 import { getStaggerStyle } from '../lib/motion'
 import { formatDateTime, getProjectCover, getRecentCommit } from '../lib/projectView'
 import { MOCK_MODE_LABEL, mockProjects, mockStatuses, mockTags } from '../lib/mockData'
+import { Skeleton } from '../components/Skeleton'
+
+function ProjectListSkeleton() {
+  return (
+    <div className="flex flex-col min-h-full w-full py-8 px-10 gap-8">
+      {/* 头部标题区 */}
+      <div className="flex items-end justify-between gap-8">
+        <div className="space-y-2 w-1/3">
+          <Skeleton className="h-4 w-24 rounded" />
+          <Skeleton className="h-10 w-48 rounded-lg" />
+          <Skeleton className="h-4 w-72 rounded mt-2" />
+        </div>
+        <Skeleton className="h-12 w-32 rounded-full" />
+      </div>
+
+      {/* 过滤器条 */}
+      <div className="glass-panel rounded-[28px] p-3 flex items-center justify-between gap-4">
+        <div className="flex items-center gap-2 px-1">
+          <Skeleton className="h-9 w-24 rounded-full" />
+          <Skeleton className="h-9 w-20 rounded-full" />
+          <Skeleton className="h-9 w-20 rounded-full" />
+        </div>
+        <Skeleton className="h-10 w-80 rounded-full" />
+      </div>
+
+      {/* 项目网格 */}
+      <div className="grid grid-cols-3 gap-6 pb-10">
+        {[1, 2, 3].map(i => (
+          <div key={i} className="glass-panel rounded-[30px] overflow-hidden min-h-[360px] flex flex-col space-y-4">
+            <Skeleton className="h-44 w-full rounded-none" />
+            <div className="p-5 flex-1 flex flex-col space-y-4">
+              <div className="flex justify-between items-center">
+                <Skeleton className="h-7 w-32 rounded" />
+                <Skeleton className="h-5 w-16 rounded-full" />
+              </div>
+              <Skeleton className="h-4 w-full rounded" />
+              <Skeleton className="h-4 w-5/6 rounded" />
+              
+              <div className="mt-auto pt-5 border-t border-white/[0.06] space-y-3">
+                <Skeleton className="h-3 w-24 rounded" />
+                <Skeleton className="h-4.5 w-full rounded" />
+                <div className="flex justify-between items-center mt-3">
+                  <div className="flex gap-2">
+                    <Skeleton className="h-5 w-12 rounded-full" />
+                    <Skeleton className="h-5 w-12 rounded-full" />
+                  </div>
+                  <Skeleton className="h-4 w-12 rounded" />
+                </div>
+              </div>
+            </div>
+          </div>
+        ))}
+      </div>
+    </div>
+  )
+}
 
 export function ProjectList() {
   const [projects, setProjects] = useState<Project[]>([])
   const [tags, setTags] = useState<Tag[]>([])
   const [statuses, setStatuses] = useState<ProjectStatus[]>([])
+  const [isLoading, setIsLoading] = useState(true)
   const [searchQuery, setSearchQuery] = useState('')
   const [activeTag, setActiveTag] = useState<string | null>(null)
   const [newProjectName, setNewProjectName] = useState('')
@@ -27,19 +84,27 @@ export function ProjectList() {
   }, [])
 
   const loadData = async () => {
-    const [p, t, s] = await Promise.all([
-      window.ipcRenderer.invoke('get-projects'),
-      window.ipcRenderer.invoke('get-tags'),
-      window.ipcRenderer.invoke('get-statuses'),
-    ])
-    setProjects(p)
-    setTags(t)
-    setStatuses(s)
-    if (!newProjectStatus && s[0]) setNewProjectStatus(s[0].id)
+    try {
+      const [p, t, s] = await Promise.all([
+        window.ipcRenderer.invoke('get-projects'),
+        window.ipcRenderer.invoke('get-tags'),
+        window.ipcRenderer.invoke('get-statuses'),
+      ])
+      setProjects(p)
+      setTags(t)
+      setStatuses(s)
+      if (!newProjectStatus && s[0]) setNewProjectStatus(s[0].id)
+    } catch (err) {
+      console.error('Failed to load projects:', err)
+    } finally {
+      setIsLoading(false)
+    }
   }
 
+  const isMockMode = !isLoading && projects.length === 0
+
   const filteredProjects = useMemo(() => {
-    const displayProjects = projects.length === 0 ? mockProjects : projects
+    const displayProjects = isMockMode ? mockProjects : projects
     return displayProjects.filter(p => {
       const matchSearch = p.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
         (p.description || '').toLowerCase().includes(searchQuery.toLowerCase()) ||
@@ -47,12 +112,15 @@ export function ProjectList() {
       const matchTag = activeTag === null || p.tags?.some(t => t.id === activeTag)
       return matchSearch && matchTag
     })
-  }, [projects, searchQuery, activeTag])
+  }, [projects, isMockMode, searchQuery, activeTag])
 
-  const isMockMode = projects.length === 0
   const displayTags = isMockMode ? mockTags : tags
   const displayStatuses = statuses.length ? statuses : mockStatuses
   const selectedStatus = displayStatuses.find(status => status.id === newProjectStatus) || displayStatuses[0]
+
+  if (isLoading) {
+    return <ProjectListSkeleton />
+  }
 
   const createProject = async () => {
     if (!newProjectName.trim()) return

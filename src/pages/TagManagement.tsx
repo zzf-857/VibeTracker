@@ -3,6 +3,8 @@ import { useNavigate } from 'react-router-dom'
 import { Tag, Project } from '../types'
 import { Tags, FolderKanban, Plus, Trash2, Edit2, Check, X } from 'lucide-react'
 import { AnimatedPage } from '../components/AnimatedPage'
+import { Skeleton } from '../components/Skeleton'
+import { ConfirmDialog } from '../components/ConfirmDialog'
 
 // Define some standard colors for selection
 const COLORS = [
@@ -14,25 +16,75 @@ const COLORS = [
   '#8B949E'  // gray
 ]
 
+function TagManagementSkeleton() {
+  return (
+    <div className="flex flex-col h-full w-full py-8 px-10 gap-8">
+      <div className="space-y-2">
+        <Skeleton className="h-7 w-32 rounded" />
+        <Skeleton className="h-4.5 w-64 rounded" />
+      </div>
+      {/* 创建栏骨架 */}
+      <div className="glass-panel flex items-center gap-4 p-4 rounded-[28px]">
+        <Skeleton className="h-10 w-80 rounded-lg" />
+        <div className="flex gap-2">
+          {[1, 2, 3, 4, 5, 6].map(i => (
+            <Skeleton key={i} className="w-6 h-6 rounded-full" />
+          ))}
+        </div>
+        <Skeleton className="h-10 w-28 rounded-lg ml-auto" />
+      </div>
+      {/* 标签列表网格骨架 */}
+      <div className="grid grid-cols-2 gap-6 flex-1 pr-2 pb-10">
+        {[1, 2, 3, 4].map(i => (
+          <div key={i} className="bg-bg-secondary rounded-[24px] border border-border-primary p-6 flex flex-col gap-5">
+            <div className="flex justify-between items-start">
+              <div className="flex items-center gap-3 w-3/4">
+                <Skeleton className="w-10 h-10 rounded-lg" />
+                <div className="space-y-2 flex-1">
+                  <Skeleton className="h-5 w-24 rounded" />
+                  <Skeleton className="h-3 w-32 rounded" />
+                </div>
+              </div>
+            </div>
+            <Skeleton className="h-7 w-24 rounded" />
+            <div className="flex gap-2">
+              <Skeleton className="h-4 w-12 rounded" />
+              <Skeleton className="h-4 w-16 rounded" />
+            </div>
+          </div>
+        ))}
+      </div>
+    </div>
+  )
+}
+
 export function TagManagement() {
   const navigate = useNavigate()
   const [tags, setTags] = useState<Tag[]>([])
   const [projects, setProjects] = useState<Project[]>([])
+  const [isLoading, setIsLoading] = useState(true)
   const [newTagName, setNewTagName] = useState('')
   const [newTagColor, setNewTagColor] = useState(COLORS[3])
   const [editingTagId, setEditingTagId] = useState<string | null>(null)
   const [editTagName, setEditTagName] = useState('')
   const [editTagColor, setEditTagColor] = useState('')
+  const [pendingDeleteTagId, setPendingDeleteTagId] = useState<string | null>(null)
 
   useEffect(() => {
     loadData()
   }, [])
 
   const loadData = async () => {
-    const t = await window.ipcRenderer.invoke('get-tags')
-    const p = await window.ipcRenderer.invoke('get-projects')
-    setTags(t)
-    setProjects(p)
+    try {
+      const t = await window.ipcRenderer.invoke('get-tags')
+      const p = await window.ipcRenderer.invoke('get-projects')
+      setTags(t)
+      setProjects(p)
+    } catch (err) {
+      console.error('Failed to load tags data:', err)
+    } finally {
+      setIsLoading(false)
+    }
   }
 
   const handleCreateTag = async () => {
@@ -42,11 +94,8 @@ export function TagManagement() {
     loadData()
   }
 
-  const handleDeleteTag = async (id: string) => {
-    if (confirm('确认删除该标签吗？')) {
-      await window.ipcRenderer.invoke('delete-tag', id)
-      loadData()
-    }
+  const handleDeleteTag = (id: string) => {
+    setPendingDeleteTagId(id)
   }
 
   const startEditing = (tag: Tag) => {
@@ -66,6 +115,10 @@ export function TagManagement() {
     await window.ipcRenderer.invoke('update-tag', editingTagId, { name: editTagName.trim(), color: editTagColor })
     setEditingTagId(null)
     loadData()
+  }
+
+  if (isLoading) {
+    return <TagManagementSkeleton />
   }
 
   return (
@@ -204,6 +257,20 @@ export function TagManagement() {
           </div>
         )}
       </div>
+
+      <ConfirmDialog
+        isOpen={pendingDeleteTagId !== null}
+        title="删除标签"
+        message="确定要删除这个标签吗？这将同时从所有关联的项目中移除该标签。此操作无法撤销。"
+        onConfirm={async () => {
+          if (pendingDeleteTagId) {
+            await window.ipcRenderer.invoke('delete-tag', pendingDeleteTagId)
+            setPendingDeleteTagId(null)
+            loadData()
+          }
+        }}
+        onCancel={() => setPendingDeleteTagId(null)}
+      />
     </AnimatedPage>
   )
 }
