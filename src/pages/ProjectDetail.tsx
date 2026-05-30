@@ -339,7 +339,7 @@ export function ProjectDetail() {
       </button>
 
       <section className="stagger-item grid grid-cols-[1fr_360px] gap-6" style={{ '--stagger': 0 } as CSSProperties}>
-        <div className="glass-panel ambient-panel motion-card rounded-[32px] p-7 min-h-[260px] flex flex-col justify-between relative z-30">
+        <div className="glass-panel ambient-panel motion-card rounded-[32px] p-7 min-h-[260px] flex flex-col justify-between relative z-30" style={{ overflow: 'visible' }}>
           <div>
             <div className="flex items-start justify-between gap-4">
               <div className="min-w-0 flex-1">
