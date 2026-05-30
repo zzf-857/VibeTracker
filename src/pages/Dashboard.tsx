@@ -355,14 +355,14 @@ function MiniHeatmap({ commits }: { commits: ProjectCommit[] }) {
   }
 
   return (
-    <div className="grid grid-cols-14 gap-1.5 w-full">
+    <div className="grid grid-cols-14 gap-1.5 w-full items-start">
       {days.map(day => {
         const className = ['bg-bg-tertiary', 'bg-status-level-1', 'bg-status-level-2', 'bg-status-level-3', 'bg-status-level-4'][day.level]
         return (
           <div
             key={day.key}
             title={`${day.key}: ${day.count} 次提交`}
-            className={`w-full aspect-square rounded-[4px] transition-all duration-200 hover:scale-110 ${className}`}
+            className={`w-full aspect-square h-auto rounded-[4px] transition-all duration-200 hover:scale-110 ${className}`}
           />
         )
       })}
