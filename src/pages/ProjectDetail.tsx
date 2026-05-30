@@ -1,7 +1,7 @@
 import { type CSSProperties, useEffect, useMemo, useRef, useState } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
-import { CommitImage, Project, ProjectCommit, ProjectStatus } from '../types'
-import { ArrowLeft, Camera, ExternalLink, Folder, Github, ImagePlus, Pencil, Plus, RotateCcw, Save, Star, Trash2, X } from 'lucide-react'
+import { CommitImage, Project, ProjectCommit, ProjectStatus, NoteBlock, Todo } from '../types'
+import { ArrowLeft, Camera, Check, CheckSquare, ExternalLink, Folder, Github, ImagePlus, Pencil, Plus, RotateCcw, Save, Square, Star, StickyNote, Trash2, X } from 'lucide-react'
 import { AnimatedPage } from '../components/AnimatedPage'
 import { SafeImage } from '../components/SafeImage'
 import { formatDateKey, formatDateTime, getActivityLevel, getProjectCover, groupCommitsByDay } from '../lib/projectView'
@@ -23,6 +23,14 @@ export function ProjectDetail() {
   const [editingCommit, setEditingCommit] = useState<ProjectCommit | null>(null)
   const [isEditingProject, setIsEditingProject] = useState(false)
   const [projectDraft, setProjectDraft] = useState({ name: '', description: '', path: '', repoUrl: '' })
+  const [pendingDeleteProject, setPendingDeleteProject] = useState(false)
+  // NoteBlocks
+  const [newNoteContent, setNewNoteContent] = useState('')
+  const [editingNoteId, setEditingNoteId] = useState<string | null>(null)
+  const [editNoteContent, setEditNoteContent] = useState('')
+  // Todos
+  const [newTodoContent, setNewTodoContent] = useState('')
+
   const isMountedRef = useRef(true)
   const creatingCommitRef = useRef(false)
   const ritualTimeoutRef = useRef<number | null>(null)
@@ -64,7 +72,10 @@ export function ProjectDetail() {
   }
 
   const commits = project?.commits || []
+  const noteblocks: NoteBlock[] = (project as any)?.noteblocks || []
+  const todos: Todo[] = (project as any)?.todos || []
   const cover = project ? getProjectCover(project) : ''
+  const isMock = isMockProjectId(project?.id)
 
   const clearRitualTimeout = () => {
     if (ritualTimeoutRef.current === null) return
@@ -91,7 +102,7 @@ export function ProjectDetail() {
 
   const createCommit = async () => {
     if (!project || !commitTitle.trim() || creatingCommitRef.current) return
-    if (isMockProjectId(project.id)) return
+    if (isMock) return
     creatingCommitRef.current = true
     setIsCreatingCommit(true)
     try {
@@ -135,16 +146,14 @@ export function ProjectDetail() {
   }
 
   const updateStatus = async (statusId: string) => {
-    if (!project) return
-    if (isMockProjectId(project.id)) return
+    if (!project || isMock) return
     await window.ipcRenderer.invoke('update-project', project.id, { status: statusId })
     if (!isMountedRef.current) return
     loadData()
   }
 
   const saveProject = async () => {
-    if (!project || !projectDraft.name.trim()) return
-    if (isMockProjectId(project.id)) return
+    if (!project || !projectDraft.name.trim() || isMock) return
     await window.ipcRenderer.invoke('update-project', project.id, {
       name: projectDraft.name.trim(),
       description: projectDraft.description.trim(),
@@ -157,8 +166,7 @@ export function ProjectDetail() {
   }
 
   const setCoverFromPath = async (imagePath: string) => {
-    if (!project) return
-    if (isMockProjectId(project.id)) return
+    if (!project || isMock) return
     await window.ipcRenderer.invoke('update-project', project.id, { coverImagePath: imagePath })
     if (!isMountedRef.current) return
     if (imagePath) triggerCoverRitual(imagePath)
@@ -182,6 +190,58 @@ export function ProjectDetail() {
     if (!result.ok) alert(result.reason || '无法打开远端仓库')
   }
 
+  const deleteProject = async () => {
+    if (!project || isMock) return
+    await window.ipcRenderer.invoke('delete-project', project.id)
+    navigate('/projects')
+  }
+
+  const createNoteBlock = async () => {
+    if (!project || !newNoteContent.trim() || isMock) return
+    await window.ipcRenderer.invoke('create-noteblock', project.id, newNoteContent.trim())
+    if (!isMountedRef.current) return
+    setNewNoteContent('')
+    loadData()
+  }
+
+  const updateNoteBlock = async (noteId: string) => {
+    if (!editNoteContent.trim() || isMock) return
+    await window.ipcRenderer.invoke('update-noteblock', noteId, editNoteContent.trim())
+    if (!isMountedRef.current) return
+    setEditingNoteId(null)
+    setEditNoteContent('')
+    loadData()
+  }
+
+  const deleteNoteBlock = async (noteId: string) => {
+    if (!project || isMock) return
+    await window.ipcRenderer.invoke('delete-noteblock', noteId)
+    if (!isMountedRef.current) return
+    loadData()
+  }
+
+  const createTodo = async () => {
+    if (!project || !newTodoContent.trim() || isMock) return
+    await window.ipcRenderer.invoke('create-todo', project.id, newTodoContent.trim())
+    if (!isMountedRef.current) return
+    setNewTodoContent('')
+    loadData()
+  }
+
+  const toggleTodo = async (todo: Todo) => {
+    if (!project || isMock) return
+    await window.ipcRenderer.invoke('update-todo', todo.id, { completed: todo.completed === 1 ? 0 : 1 })
+    if (!isMountedRef.current) return
+    loadData()
+  }
+
+  const deleteTodo = async (todoId: string) => {
+    if (!project || isMock) return
+    await window.ipcRenderer.invoke('delete-todo', todoId)
+    if (!isMountedRef.current) return
+    loadData()
+  }
+
   if (!project) return <div className="p-10 text-text-secondary">正在读取项目...</div>
 
   return (
@@ -191,13 +251,13 @@ export function ProjectDetail() {
       </button>
 
       <section className="stagger-item grid grid-cols-[1fr_360px] gap-6" style={{ '--stagger': 0 } as CSSProperties}>
-        <div className="glass-panel ambient-panel motion-card rounded-[32px] p-7 min-h-[260px] flex flex-col justify-between">
+        <div className="glass-panel ambient-panel motion-card rounded-[32px] p-7 min-h-[260px] flex flex-col justify-between relative">
           <div>
             <div className="flex items-start justify-between gap-4">
               <div className="min-w-0 flex-1">
                 <div className="flex items-center gap-2 mb-2">
                   <p className="text-text-tertiary text-sm">Project Dossier</p>
-                  {isMockProjectId(project.id) && <span className="px-2.5 py-1 rounded-full bg-white/[0.08] border border-border-subtle text-[11px] text-text-secondary">{MOCK_MODE_LABEL}</span>}
+                  {isMock && <span className="px-2.5 py-1 rounded-full bg-white/[0.08] border border-border-subtle text-[11px] text-text-secondary">{MOCK_MODE_LABEL}</span>}
                 </div>
                 {isEditingProject ? (
                   <input
@@ -210,11 +270,11 @@ export function ProjectDetail() {
                   <h1 className="text-[38px] font-semibold tracking-normal truncate">{project.name}</h1>
                 )}
               </div>
-              <div className="flex items-center gap-2 flex-shrink-0">
+              <div className="flex items-center gap-2 flex-shrink-0 relative">
                 <select
                   value={project.status}
                   onChange={e => updateStatus(e.target.value)}
-                  disabled={isMockProjectId(project.id)}
+                  disabled={isMock}
                   className="bg-bg-tertiary border border-border-subtle rounded-full px-4 py-2 text-sm outline-none"
                   style={{ color: project.statusInfo?.color || undefined }}
                 >
@@ -222,13 +282,31 @@ export function ProjectDetail() {
                 </select>
                 <button
                   onClick={() => setIsEditingProject(prev => !prev)}
-                  disabled={isMockProjectId(project.id)}
+                  disabled={isMock}
                   className="w-9 h-9 rounded-full bg-bg-tertiary border border-border-subtle text-text-secondary hover:text-text-primary grid place-items-center transition-colors"
                   title={isEditingProject ? '收起编辑' : '编辑项目'}
                 >
                   {isEditingProject ? <X size={15} /> : <Pencil size={15} />}
                 </button>
+                {!isMock && (
+                  <button
+                    onClick={() => setPendingDeleteProject(true)}
+                    className="w-9 h-9 rounded-full bg-bg-tertiary border border-border-subtle text-text-secondary hover:text-accent-red hover:bg-accent-red/10 grid place-items-center transition-colors"
+                    title="删除项目"
+                  >
+                    <Trash2 size={15} />
+                  </button>
+                )}
               </div>
+              {pendingDeleteProject && (
+                <div className="absolute right-0 top-full mt-2 z-10 bg-bg-secondary border border-accent-red/30 rounded-2xl p-4 shadow-xl min-w-[260px]">
+                  <p className="text-sm text-text-primary mb-3">确认删除项目 <strong>{project.name}</strong>？此操作不可撤销。</p>
+                  <div className="flex gap-2 justify-end">
+                    <button onClick={() => setPendingDeleteProject(false)} className="motion-action px-3 py-1.5 rounded-lg bg-bg-tertiary border border-border-subtle text-sm text-text-secondary hover:text-text-primary transition-colors">取消</button>
+                    <button onClick={deleteProject} className="motion-action px-3 py-1.5 rounded-lg bg-accent-red/15 border border-accent-red/30 text-sm text-accent-red hover:bg-accent-red/25 transition-colors">确认删除</button>
+                  </div>
+                </div>
+              )}
             </div>
             {isEditingProject ? (
               <div className="mt-5 space-y-3">
@@ -278,6 +356,15 @@ export function ProjectDetail() {
               </button>
             )}
           </div>
+          {pendingDeleteProject && (
+            <div className="rounded-2xl border border-accent-red/25 bg-accent-red/10 px-4 py-3 mt-4 flex items-center justify-between gap-3">
+              <span className="text-sm text-text-secondary">确认删除项目「{project.name}」？所有提交、备注和待办事项都会被永久移除。</span>
+              <div className="flex items-center gap-2">
+                <button onClick={deleteProject} className="motion-action h-8 px-3 rounded-full bg-accent-red text-white text-xs font-medium flex items-center gap-1.5"><Check size={13} /> 确认删除</button>
+                <button onClick={() => setPendingDeleteProject(false)} className="motion-action h-8 px-3 rounded-full bg-white/10 text-text-secondary text-xs font-medium flex items-center gap-1.5"><X size={13} /> 取消</button>
+              </div>
+            </div>
+          )}
         </div>
 
         <div className="glass-panel ambient-panel motion-card rounded-[32px] overflow-hidden min-h-[260px]">
@@ -372,6 +459,135 @@ export function ProjectDetail() {
             {commits.flatMap(c => c.images || []).length === 0 && <p className="text-sm text-text-tertiary">还没有提交截图。</p>}
           </section>
         </aside>
+      </section>
+
+      {/* Section 3: NoteBlocks & Todos */}
+      <section className="stagger-item grid grid-cols-2 gap-6" style={{ '--stagger': 2 } as CSSProperties}>
+        {/* NoteBlocks */}
+        <div className="glass-panel motion-card rounded-[32px] p-6 flex flex-col">
+          <div className="flex items-center gap-2 mb-5">
+            <StickyNote size={18} className="text-accent-purple" />
+            <h2 className="text-xl font-semibold">备注</h2>
+            <span className="text-xs text-text-tertiary ml-auto">{noteblocks.length} 条</span>
+          </div>
+          {!isMock && (
+            <div className="flex gap-2 mb-4">
+              <textarea
+                value={newNoteContent}
+                onChange={e => setNewNoteContent(e.target.value)}
+                onKeyDown={e => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); createNoteBlock() } }}
+                className="motion-focus flex-1 bg-bg-tertiary border border-border-subtle rounded-2xl px-4 py-2.5 text-sm outline-none focus:border-border-primary resize-none h-[68px]"
+                placeholder="记录一些想法、待查的问题、灵感..."
+              />
+              <button
+                onClick={createNoteBlock}
+                disabled={!newNoteContent.trim()}
+                className="motion-press self-end bg-text-primary text-primary rounded-full w-9 h-9 grid place-items-center transition-opacity hover:opacity-90 disabled:opacity-30 flex-shrink-0"
+              >
+                <Plus size={16} />
+              </button>
+            </div>
+          )}
+          <div className="space-y-3 overflow-y-auto max-h-[400px] pr-1 custom-scrollbar flex-1">
+            {noteblocks.map(note => (
+              <div key={note.id} className="bg-bg-secondary border border-border-subtle rounded-2xl p-4 group">
+                {editingNoteId === note.id ? (
+                  <div>
+                    <textarea
+                      value={editNoteContent}
+                      onChange={e => setEditNoteContent(e.target.value)}
+                      className="motion-focus w-full bg-bg-tertiary border border-border-subtle rounded-xl px-3 py-2 text-sm outline-none focus:border-border-primary resize-none h-[80px]"
+                      autoFocus
+                    />
+                    <div className="flex gap-2 mt-2 justify-end">
+                      <button onClick={() => setEditingNoteId(null)} className="motion-action text-xs text-text-tertiary hover:text-text-primary px-2 py-1">取消</button>
+                      <button onClick={() => updateNoteBlock(note.id)} className="motion-action text-xs text-accent-blue hover:text-accent-blue/80 px-2 py-1">保存</button>
+                    </div>
+                  </div>
+                ) : (
+                  <div>
+                    <p
+                      onClick={() => { if (!isMock) { setEditingNoteId(note.id); setEditNoteContent(note.content) } }}
+                      className={`text-sm text-text-secondary leading-6 whitespace-pre-wrap ${!isMock ? 'cursor-pointer hover:text-text-primary' : ''}`}
+                    >
+                      {note.content}
+                    </p>
+                    <div className="flex items-center justify-between mt-3">
+                      <span className="text-[11px] text-text-tertiary font-mono">{formatDateTime(note.updatedAt)}</span>
+                      {!isMock && (
+                        <button onClick={() => deleteNoteBlock(note.id)} className="opacity-0 group-hover:opacity-100 text-text-tertiary hover:text-accent-red transition-all p-1">
+                          <Trash2 size={12} />
+                        </button>
+                      )}
+                    </div>
+                  </div>
+                )}
+              </div>
+            ))}
+            {noteblocks.length === 0 && (
+              <div className="flex flex-col items-center justify-center py-10 text-text-tertiary">
+                <StickyNote size={28} className="mb-2 opacity-50" />
+                <p className="text-sm">还没有备注</p>
+              </div>
+            )}
+          </div>
+        </div>
+
+        {/* Todos */}
+        <div className="glass-panel motion-card rounded-[32px] p-6 flex flex-col">
+          <div className="flex items-center gap-2 mb-5">
+            <CheckSquare size={18} className="text-status-completed" />
+            <h2 className="text-xl font-semibold">待办事项</h2>
+            <span className="text-xs text-text-tertiary ml-auto">
+              {todos.filter(t => t.completed).length}/{todos.length}
+            </span>
+          </div>
+          {!isMock && (
+            <div className="flex gap-2 mb-4">
+              <input
+                value={newTodoContent}
+                onChange={e => setNewTodoContent(e.target.value)}
+                onKeyDown={e => { if (e.key === 'Enter') createTodo() }}
+                className="motion-focus flex-1 bg-bg-tertiary border border-border-subtle rounded-2xl px-4 py-2.5 text-sm outline-none focus:border-border-primary"
+                placeholder="添加一个待办..."
+              />
+              <button
+                onClick={createTodo}
+                disabled={!newTodoContent.trim()}
+                className="motion-press bg-text-primary text-primary rounded-full w-9 h-9 grid place-items-center transition-opacity hover:opacity-90 disabled:opacity-30 flex-shrink-0"
+              >
+                <Plus size={16} />
+              </button>
+            </div>
+          )}
+          <div className="space-y-2 overflow-y-auto max-h-[400px] pr-1 custom-scrollbar flex-1">
+            {todos.map(todo => (
+              <div key={todo.id} className="flex items-center gap-3 bg-bg-secondary border border-border-subtle rounded-2xl px-4 py-3 group transition-colors hover:bg-bg-tertiary">
+                <button
+                  onClick={() => toggleTodo(todo)}
+                  disabled={isMock}
+                  className={`flex-shrink-0 transition-colors ${todo.completed ? 'text-status-completed' : 'text-text-tertiary hover:text-text-secondary'}`}
+                >
+                  {todo.completed ? <CheckSquare size={18} /> : <Square size={18} />}
+                </button>
+                <span className={`text-sm flex-1 ${todo.completed ? 'line-through text-text-tertiary' : 'text-text-primary'}`}>
+                  {todo.content}
+                </span>
+                {!isMock && (
+                  <button onClick={() => deleteTodo(todo.id)} className="opacity-0 group-hover:opacity-100 text-text-tertiary hover:text-accent-red transition-all p-1 flex-shrink-0">
+                    <Trash2 size={12} />
+                  </button>
+                )}
+              </div>
+            ))}
+            {todos.length === 0 && (
+              <div className="flex flex-col items-center justify-center py-10 text-text-tertiary">
+                <CheckSquare size={28} className="mb-2 opacity-50" />
+                <p className="text-sm">还没有待办事项</p>
+              </div>
+            )}
+          </div>
+        </div>
       </section>
 
       {editingCommit && (
