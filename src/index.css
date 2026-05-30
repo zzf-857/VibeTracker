@@ -835,3 +835,21 @@ body {
     transform: none !important;
   }
 }
+
+/* 全局大图预览渐入动画 */
+@keyframes fadeInPreview {
+  from {
+    opacity: 0;
+    backdrop-filter: blur(0px);
+    background-color: rgba(0, 0, 0, 0);
+  }
+  to {
+    opacity: 1;
+    backdrop-filter: blur(24px);
+    background-color: rgba(0, 0, 0, 0.75);
+  }
+}
+
+.animate-fade-in {
+  animation: fadeInPreview 0.22s cubic-bezier(0.2, 0, 0, 1) forwards;
+}

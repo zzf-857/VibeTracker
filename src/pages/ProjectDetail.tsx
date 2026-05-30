@@ -1,9 +1,10 @@
 import { type CSSProperties, useEffect, useMemo, useRef, useState } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import { CommitImage, Project, ProjectCommit, ProjectStatus, NoteBlock, Todo } from '../types'
-import { ArrowLeft, Camera, Check, CheckSquare, ChevronDown, ExternalLink, Folder, Github, ImagePlus, Pencil, Plus, RotateCcw, Save, Square, Star, StickyNote, Trash2, X } from 'lucide-react'
+import { ArrowLeft, Camera, Check, CheckSquare, ChevronDown, ExternalLink, Folder, Github, ImagePlus, Maximize2, Pencil, Plus, RotateCcw, Save, Square, Star, StickyNote, Trash2, X } from 'lucide-react'
 import { AnimatedPage } from '../components/AnimatedPage'
 import { SafeImage } from '../components/SafeImage'
+import { useImagePreview } from '../components/ImagePreview'
 import { formatDateKey, formatDateTime, getActivityLevel, getProjectCover, groupCommitsByDay } from '../lib/projectView'
 import { MOCK_MODE_LABEL, getMockProject, isMockProjectId, mockStatuses } from '../lib/mockData'
 import { Skeleton } from '../components/Skeleton'
@@ -487,7 +488,7 @@ export function ProjectDetail() {
         <div className="glass-panel ambient-panel motion-card rounded-[32px] overflow-hidden min-h-[260px]">
           {cover ? (
             <div className="relative h-full min-h-[260px] group">
-              <SafeImage src={cover} alt={`${project.name} 封面`} className="w-full h-full object-cover" />
+              <SafeImage src={cover} alt={`${project.name} 封面`} className="w-full h-full object-cover" previewable={true} />
               {coverRitualKey && <span key={coverRitualKey} className="cover-sheen-layer" aria-hidden="true" />}
               <div className="absolute inset-x-0 bottom-0 p-4 bg-gradient-to-t from-black/65 to-transparent flex items-center gap-2">
                 <button onClick={selectManualCover} className="px-3 py-1.5 rounded-full bg-white/12 border border-white/15 text-xs text-white/85 hover:text-white backdrop-blur-md flex items-center gap-1.5">
@@ -734,6 +735,8 @@ export function ProjectDetail() {
 }
 
 function CommitCard({ commit, onEdit, onDelete, onSetCover, isNew }: { commit: ProjectCommit; onEdit: () => void; onDelete: () => void; onSetCover: (path: string) => void; isNew?: boolean }) {
+  const { showPreview } = useImagePreview()
+
   return (
     <article className={`motion-card commit-card relative bg-bg-secondary border border-border-subtle rounded-[24px] p-5 transition-all duration-[220ms] hover:bg-bg-tertiary before:absolute before:-left-[31px] before:top-6 before:w-4 before:h-4 before:rounded-full before:bg-status-completed before:border-[4px] before:border-[#111318] ${isNew ? 'commit-card-new ritual-timeline' : ''}`}>
       <div className="flex items-start justify-between gap-4">
@@ -753,9 +756,31 @@ function CommitCard({ commit, onEdit, onDelete, onSetCover, isNew }: { commit: P
       {(commit.images || []).length > 0 && (
         <div className="grid grid-cols-3 gap-3 mt-4">
           {commit.images?.map(image => (
-            <button key={image.id} onClick={() => onSetCover(image.imagePath)} className="aspect-video rounded-2xl overflow-hidden bg-bg-tertiary border border-border-subtle group">
-              <SafeImage src={image.imagePath} alt={image.caption || commit.title} className="w-full h-full object-cover transition-transform duration-300 group-hover:scale-[1.03]" />
-            </button>
+            <div key={image.id} className="relative aspect-video rounded-2xl overflow-hidden bg-bg-tertiary border border-border-subtle group/img">
+              <SafeImage src={image.imagePath} alt={image.caption || commit.title} className="w-full h-full object-cover transition-transform duration-300 group-hover/img:scale-[1.03]" />
+              
+              {/* 精美悬浮遮罩及工具栏 */}
+              <div className="absolute inset-0 bg-black/45 opacity-0 group-hover/img:opacity-100 transition-opacity duration-200 flex items-center justify-center gap-3 z-10">
+                <button
+                  type="button"
+                  onClick={() => showPreview(image.imagePath)}
+                  className="w-9 h-9 rounded-full bg-white/10 hover:bg-white/20 text-white flex items-center justify-center backdrop-blur-md transition-all hover:scale-105 active:scale-95 shadow-md"
+                  title="放大预览"
+                  style={{ cursor: 'pointer' }}
+                >
+                  <Maximize2 size={14} />
+                </button>
+                <button
+                  type="button"
+                  onClick={() => onSetCover(image.imagePath)}
+                  className="w-9 h-9 rounded-full bg-white/10 hover:bg-white/20 text-white flex items-center justify-center backdrop-blur-md transition-all hover:scale-105 active:scale-95 shadow-md"
+                  title="设为项目封面"
+                  style={{ cursor: 'pointer' }}
+                >
+                  <Star size={14} />
+                </button>
+              </div>
+            </div>
           ))}
         </div>
       )}
@@ -839,7 +864,7 @@ function CommitEditor({
               {images.map(image => (
                 <div key={image.id} className="grid grid-cols-[112px_1fr_auto] gap-3 items-center">
                   <div className="aspect-video rounded-2xl overflow-hidden bg-bg-tertiary border border-border-subtle">
-                    <SafeImage src={image.imagePath} alt={image.caption || title} className="w-full h-full object-cover" />
+                    <SafeImage src={image.imagePath} alt={image.caption || title} className="w-full h-full object-cover" previewable={true} />
                   </div>
                   <div className="min-w-0">
                     <p className="text-sm text-text-secondary truncate">{image.caption || '未命名截图'}</p>

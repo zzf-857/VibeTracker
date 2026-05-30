@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import { ImageOff } from 'lucide-react'
 import { toImageSrc } from '../lib/projectView'
+import { useImagePreview } from './ImagePreview'
 
 const imageCache = new Map<string, string>()
 const MAX_CACHE_SIZE = 100
@@ -15,9 +16,20 @@ function writeCache(key: string, value: string) {
   imageCache.set(key, value)
 }
 
-export function SafeImage({ src, alt, className }: { src: string; alt: string; className?: string }) {
+export function SafeImage({ 
+  src, 
+  alt, 
+  className,
+  previewable = false
+}: { 
+  src: string; 
+  alt: string; 
+  className?: string;
+  previewable?: boolean
+}) {
   const [failed, setFailed] = useState(false)
   const [resolvedSrc, setResolvedSrc] = useState('')
+  const { showPreview } = useImagePreview()
 
   useEffect(() => {
     let cancelled = false
@@ -73,5 +85,21 @@ export function SafeImage({ src, alt, className }: { src: string; alt: string; c
     )
   }
 
-  return <img src={resolvedSrc} alt={alt} className={className} onError={() => setFailed(true)} />
+  const handleClick = (e: React.MouseEvent<HTMLImageElement>) => {
+    if (previewable) {
+      e.stopPropagation()
+      showPreview(resolvedSrc)
+    }
+  }
+
+  return (
+    <img 
+      src={resolvedSrc} 
+      alt={alt} 
+      className={`${className || ''} ${previewable ? 'cursor-zoom-in transition-all duration-200 hover:brightness-105' : ''}`} 
+      onClick={handleClick}
+      onError={() => setFailed(true)} 
+    />
+  )
 }
+
