@@ -2,6 +2,19 @@ import { useEffect, useState } from 'react'
 import { ImageOff } from 'lucide-react'
 import { toImageSrc } from '../lib/projectView'
 
+const imageCache = new Map<string, string>()
+const MAX_CACHE_SIZE = 100
+
+function writeCache(key: string, value: string) {
+  if (imageCache.size >= MAX_CACHE_SIZE) {
+    const firstKey = imageCache.keys().next().value
+    if (firstKey !== undefined) {
+      imageCache.delete(firstKey)
+    }
+  }
+  imageCache.set(key, value)
+}
+
 export function SafeImage({ src, alt, className }: { src: string; alt: string; className?: string }) {
   const [failed, setFailed] = useState(false)
   const [resolvedSrc, setResolvedSrc] = useState('')
@@ -21,11 +34,25 @@ export function SafeImage({ src, alt, className }: { src: string; alt: string; c
         return
       }
 
+      // Check Cache First
+      if (imageCache.has(src)) {
+        setResolvedSrc(imageCache.get(src)!)
+        return
+      }
+
       try {
         const dataUrl = await window.ipcRenderer.invoke('read-image-data-url', src)
-        if (!cancelled) setResolvedSrc(dataUrl || toImageSrc(src))
+        if (!cancelled) {
+          const finalSrc = dataUrl || toImageSrc(src)
+          setResolvedSrc(finalSrc)
+          if (dataUrl) {
+            writeCache(src, dataUrl)
+          }
+        }
       } catch {
-        if (!cancelled) setResolvedSrc(toImageSrc(src))
+        if (!cancelled) {
+          setResolvedSrc(toImageSrc(src))
+        }
       }
     }
 

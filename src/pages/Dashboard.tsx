@@ -1,12 +1,14 @@
 import { type CSSProperties, useEffect, useMemo, useRef, useState } from 'react'
 import { Activity, Clock3, FolderOpen, Plus, Sparkles } from 'lucide-react'
-import { Project, ProjectCommit, ProjectStatus } from '../types'
+import { Project, ProjectCommit } from '../types'
 import { useNavigate } from 'react-router-dom'
 import { AnimatedPage } from '../components/AnimatedPage'
 import { SafeImage } from '../components/SafeImage'
 import { formatDateKey, formatDateTime, getActivityLevel, getProjectCover, getRecentCommit, groupCommitsByDay } from '../lib/projectView'
 import { MOCK_MODE_LABEL, mockCommits, mockProjects, mockStatuses } from '../lib/mockData'
 import { Skeleton } from '../components/Skeleton'
+import { useStore } from '../lib/store'
+
 
 function DashboardSkeleton() {
   return (
@@ -97,36 +99,33 @@ function DashboardSkeleton() {
 }
 
 export function Dashboard() {
-  const [projects, setProjects] = useState<Project[]>([])
-  const [statuses, setStatuses] = useState<ProjectStatus[]>([])
+  const { projects, statuses, isLoaded, refresh } = useStore()
   const [allCommits, setAllCommits] = useState<ProjectCommit[]>([])
-  const [isLoading, setIsLoading] = useState(true)
   const navigate = useNavigate()
 
   useEffect(() => {
-    Promise.all([
-      window.ipcRenderer.invoke('get-projects'),
-      window.ipcRenderer.invoke('get-statuses'),
-    ]).then(async ([p, s]) => {
-      setProjects(p)
-      setStatuses(s)
-      const commits = await Promise.all(p.map((project: Project) => window.ipcRenderer.invoke('get-commits', project.id)))
-      setAllCommits(commits.flat())
-      setIsLoading(false)
-    }).catch(err => {
-      console.error('Failed to load dashboard:', err)
-      setIsLoading(false)
-    })
-  }, [])
+    if (!isLoaded) {
+      refresh()
+    }
+  }, [isLoaded, refresh])
 
+  useEffect(() => {
+    if (projects.length > 0) {
+      Promise.all(projects.map((project: Project) => window.ipcRenderer.invoke('get-commits', project.id)))
+        .then(commits => {
+          setAllCommits(commits.flat())
+        })
+        .catch(err => {
+          console.error('Failed to load commits for dashboard:', err)
+        })
+    }
+  }, [projects])
+
+  const isLoading = !isLoaded
   const isMockMode = !isLoading && projects.length === 0
   const displayProjects = isMockMode ? mockProjects : projects
   const displayStatuses = isMockMode ? mockStatuses : statuses
   const displayCommits = isMockMode ? mockCommits : allCommits
-
-  if (isLoading) {
-    return <DashboardSkeleton />
-  }
 
   const commits = useMemo(() => {
     return displayProjects
@@ -138,6 +137,10 @@ export function Dashboard() {
 
   const totalCommits = displayCommits.length || displayProjects.reduce((sum, project) => sum + (project.commitCount || 0), 0)
   const recentSevenDayCount = displayCommits.filter(commit => Date.now() - commit.createdAt <= 7 * 24 * 60 * 60 * 1000).length
+
+  if (isLoading) {
+    return <DashboardSkeleton />
+  }
 
   return (
     <AnimatedPage tone="standard" className="flex flex-col min-h-full w-full py-8 px-10 gap-8">

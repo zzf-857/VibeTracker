@@ -4,6 +4,8 @@ import { AnimatedPage } from '../components/AnimatedPage'
 import { ProjectStatus } from '../types'
 import { validateStatusName } from '../lib/statusValidation'
 import { Skeleton } from '../components/Skeleton'
+import { useStore } from '../lib/store'
+
 
 const COLORS = ['#74A9FF', '#63D693', '#F3BB6C', '#B8A6FF', '#A8B0BD', '#FF6B6B']
 
@@ -59,6 +61,7 @@ function SettingsSkeleton() {
 }
 
 export function Settings() {
+  const { statuses: storeStatuses, isLoaded, refresh } = useStore()
   const [statuses, setStatuses] = useState<ProjectStatus[]>([])
   const [isLoading, setIsLoading] = useState(true)
   const [newName, setNewName] = useState('')
@@ -72,23 +75,17 @@ export function Settings() {
   const dragStartOrderRef = useRef<ProjectStatus[]>([])
 
   useEffect(() => {
-    loadStatuses()
-  }, [])
+    if (isLoaded) {
+      setStatuses(storeStatuses)
+      setIsLoading(false)
+    } else {
+      refresh()
+    }
+  }, [isLoaded, storeStatuses, refresh])
 
   useEffect(() => {
     statusesRef.current = statuses
   }, [statuses])
-
-  const loadStatuses = async () => {
-    try {
-      const data = await window.ipcRenderer.invoke('get-statuses')
-      setStatuses(data)
-    } catch (err) {
-      console.error('Failed to load statuses:', err)
-    } finally {
-      setIsLoading(false)
-    }
-  }
 
   const createStatus = async () => {
     const validation = validateStatusName(newName, statuses)
@@ -99,7 +96,7 @@ export function Settings() {
     await window.ipcRenderer.invoke('create-status', { name: validation.value, color: newColor })
     setNewName('')
     setNotice('状态已创建')
-    loadStatuses()
+    await refresh()
   }
 
   const updateStatus = async (id: string, data: Partial<ProjectStatus>) => {
@@ -110,7 +107,7 @@ export function Settings() {
     }
     await window.ipcRenderer.invoke('update-status', id, { ...data, name: validation.value })
     setNotice('状态已保存')
-    loadStatuses()
+    await refresh()
   }
 
   const requestDeleteStatus = (status: ProjectStatus) => {
@@ -134,7 +131,7 @@ export function Settings() {
     }
     setPendingDeleteId(null)
     setNotice('状态已删除')
-    loadStatuses()
+    await refresh()
   }
 
   const moveStatus = async (id: string, direction: -1 | 1) => {
@@ -146,7 +143,7 @@ export function Settings() {
     next.splice(nextIndex, 0, item)
     await window.ipcRenderer.invoke('reorder-statuses', next.map(status => status.id))
     setNotice('状态顺序已更新')
-    loadStatuses()
+    await refresh()
   }
 
   const previewDraggedStatus = (dragId: string, targetId: string) => {
@@ -178,7 +175,7 @@ export function Settings() {
     try {
       await window.ipcRenderer.invoke('reorder-statuses', next.map(status => status.id))
       setNotice('状态顺序已更新')
-      await loadStatuses()
+      await refresh()
     } catch {
       setStatuses(previous)
       setNotice('状态顺序保存失败，已恢复原顺序')

@@ -21,14 +21,14 @@ db.exec(`
     description TEXT,
     path TEXT,
     status TEXT DEFAULT 'developing',
-    progress REAL DEFAULT 0,
+    progress REAL DEFAULT 0 CHECK(progress >= 0 AND progress <= 100),
     createdAt INTEGER NOT NULL,
     updatedAt INTEGER NOT NULL
   );
 
   CREATE TABLE IF NOT EXISTS tags (
     id TEXT PRIMARY KEY,
-    name TEXT NOT NULL,
+    name TEXT NOT NULL UNIQUE,
     color TEXT NOT NULL,
     createdAt INTEGER NOT NULL
   );
@@ -54,7 +54,7 @@ db.exec(`
     id TEXT PRIMARY KEY,
     projectId TEXT,
     content TEXT NOT NULL,
-    completed INTEGER DEFAULT 0,
+    completed INTEGER DEFAULT 0 CHECK(completed IN (0, 1)),
     createdAt INTEGER NOT NULL,
     updatedAt INTEGER NOT NULL,
     FOREIGN KEY(projectId) REFERENCES projects(id) ON DELETE CASCADE

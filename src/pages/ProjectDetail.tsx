@@ -8,6 +8,8 @@ import { formatDateKey, formatDateTime, getActivityLevel, getProjectCover, group
 import { MOCK_MODE_LABEL, getMockProject, isMockProjectId, mockStatuses } from '../lib/mockData'
 import { Skeleton } from '../components/Skeleton'
 import { ConfirmDialog } from '../components/ConfirmDialog'
+import { useStore } from '../lib/store'
+
 
 function ProjectDetailSkeleton() {
   return (
@@ -82,6 +84,7 @@ function ProjectDetailSkeleton() {
 export function ProjectDetail() {
   const { id } = useParams<{ id: string }>()
   const navigate = useNavigate()
+  const { refresh } = useStore()
   const [project, setProject] = useState<Project | null>(null)
   const [statuses, setStatuses] = useState<ProjectStatus[]>([])
   const [isLoading, setIsLoading] = useState(true)
@@ -113,6 +116,7 @@ export function ProjectDetail() {
   useEffect(() => {
     setIsLoading(true)
     loadData()
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [id])
 
   useEffect(() => {
@@ -132,6 +136,7 @@ export function ProjectDetail() {
       path: project.path || '',
       repoUrl: project.repoUrl || '',
     })
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [project?.id])
 
   const loadData = async () => {
@@ -145,6 +150,7 @@ export function ProjectDetail() {
       const mockProject = (!p || Array.isArray(p)) && isMockProjectId(id) ? getMockProject(id) : null
       setProject(mockProject || p)
       setStatuses(mockProject ? mockStatuses : s)
+      refresh()
     } catch (err) {
       console.error('Failed to load project:', err)
     } finally {
@@ -153,8 +159,8 @@ export function ProjectDetail() {
   }
 
   const commits = project?.commits || []
-  const noteblocks: NoteBlock[] = (project as any)?.noteblocks || []
-  const todos: Todo[] = (project as any)?.todos || []
+  const noteblocks: NoteBlock[] = project?.noteblocks || []
+  const todos: Todo[] = project?.todos || []
   const cover = project ? getProjectCover(project) : ''
   const isMock = isMockProjectId(project?.id)
 
@@ -205,16 +211,13 @@ export function ProjectDetail() {
       setCommitDescription('')
       setProgressDelta('')
       setCommitImagePath('')
-      try {
-        await loadData()
-      } finally {
+      await loadData()
+      if (!isMountedRef.current) return
+      ritualTimeoutRef.current = window.setTimeout(() => {
         if (!isMountedRef.current) return
-        ritualTimeoutRef.current = window.setTimeout(() => {
-          if (!isMountedRef.current) return
-          setRitualCommitId(current => current === createdId ? null : current)
-          ritualTimeoutRef.current = null
-        }, 1200)
-      }
+        setRitualCommitId(current => current === createdId ? null : current)
+        ritualTimeoutRef.current = null
+      }, 1200)
     } finally {
       creatingCommitRef.current = false
       if (isMountedRef.current) setIsCreatingCommit(false)
@@ -274,6 +277,7 @@ export function ProjectDetail() {
   const deleteProject = async () => {
     if (!project || isMock) return
     await window.ipcRenderer.invoke('delete-project', project.id)
+    await refresh()
     navigate('/projects')
   }
 

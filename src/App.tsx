@@ -1,6 +1,7 @@
 import { HashRouter as Router, Routes, Route } from 'react-router-dom'
 import { Layout } from './components/Layout'
 import { ErrorBoundary } from './components/ErrorBoundary'
+import { ProjectProvider } from './lib/store'
 
 import { Dashboard } from './pages/Dashboard'
 import { ProjectList } from './pages/ProjectList'
@@ -11,7 +12,8 @@ import { ProjectDetail } from './pages/ProjectDetail'
 function App() {
   return (
     <ErrorBoundary>
-      <Router>
+      <ProjectProvider>
+        <Router>
         <Routes>
           <Route path="/" element={<Layout />}>
             <Route index element={<Dashboard />} />
@@ -22,6 +24,7 @@ function App() {
           </Route>
         </Routes>
       </Router>
+      </ProjectProvider>
     </ErrorBoundary>
   )
 }

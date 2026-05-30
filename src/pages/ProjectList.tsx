@@ -1,5 +1,5 @@
 import { type CSSProperties, useEffect, useMemo, useState } from 'react'
-import { Project, ProjectStatus, Tag } from '../types'
+import { Project } from '../types'
 import { Check, ChevronDown, Search, Plus, Image, Sparkles, Folder, X } from 'lucide-react'
 import { useNavigate } from 'react-router-dom'
 import { AnimatedPage } from '../components/AnimatedPage'
@@ -8,6 +8,8 @@ import { getStaggerStyle } from '../lib/motion'
 import { formatDateTime, getProjectCover, getRecentCommit } from '../lib/projectView'
 import { MOCK_MODE_LABEL, mockProjects, mockStatuses, mockTags } from '../lib/mockData'
 import { Skeleton } from '../components/Skeleton'
+import { useStore } from '../lib/store'
+
 
 function ProjectListSkeleton() {
   return (
@@ -65,10 +67,7 @@ function ProjectListSkeleton() {
 }
 
 export function ProjectList() {
-  const [projects, setProjects] = useState<Project[]>([])
-  const [tags, setTags] = useState<Tag[]>([])
-  const [statuses, setStatuses] = useState<ProjectStatus[]>([])
-  const [isLoading, setIsLoading] = useState(true)
+  const { projects, statuses, tags, isLoaded, refresh } = useStore()
   const [searchQuery, setSearchQuery] = useState('')
   const [activeTag, setActiveTag] = useState<string | null>(null)
   const [newProjectName, setNewProjectName] = useState('')
@@ -80,26 +79,18 @@ export function ProjectList() {
   const navigate = useNavigate()
 
   useEffect(() => {
-    loadData()
-  }, [])
-
-  const loadData = async () => {
-    try {
-      const [p, t, s] = await Promise.all([
-        window.ipcRenderer.invoke('get-projects'),
-        window.ipcRenderer.invoke('get-tags'),
-        window.ipcRenderer.invoke('get-statuses'),
-      ])
-      setProjects(p)
-      setTags(t)
-      setStatuses(s)
-      if (!newProjectStatus && s[0]) setNewProjectStatus(s[0].id)
-    } catch (err) {
-      console.error('Failed to load projects:', err)
-    } finally {
-      setIsLoading(false)
+    if (!isLoaded) {
+      refresh()
     }
-  }
+  }, [isLoaded, refresh])
+
+  useEffect(() => {
+    if (statuses.length > 0 && !newProjectStatus) {
+      setNewProjectStatus(statuses[0].id)
+    }
+  }, [statuses, newProjectStatus])
+
+  const isLoading = !isLoaded
 
   const isMockMode = !isLoading && projects.length === 0
 
@@ -131,6 +122,7 @@ export function ProjectList() {
       status: newProjectStatus || statuses[0]?.id,
       progress: 0,
     })
+    await refresh()
     setNewProjectName('')
     setNewProjectDescription('')
     setNewProjectPath('')

@@ -1,10 +1,12 @@
 import { type CSSProperties, useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { Tag, Project } from '../types'
+import { Tag } from '../types'
 import { Tags, FolderKanban, Plus, Trash2, Edit2, Check, X } from 'lucide-react'
 import { AnimatedPage } from '../components/AnimatedPage'
 import { Skeleton } from '../components/Skeleton'
 import { ConfirmDialog } from '../components/ConfirmDialog'
+import { useStore } from '../lib/store'
+
 
 // Define some standard colors for selection
 const COLORS = [
@@ -60,9 +62,7 @@ function TagManagementSkeleton() {
 
 export function TagManagement() {
   const navigate = useNavigate()
-  const [tags, setTags] = useState<Tag[]>([])
-  const [projects, setProjects] = useState<Project[]>([])
-  const [isLoading, setIsLoading] = useState(true)
+  const { tags, projects, isLoaded, refresh } = useStore()
   const [newTagName, setNewTagName] = useState('')
   const [newTagColor, setNewTagColor] = useState(COLORS[3])
   const [editingTagId, setEditingTagId] = useState<string | null>(null)
@@ -71,27 +71,16 @@ export function TagManagement() {
   const [pendingDeleteTagId, setPendingDeleteTagId] = useState<string | null>(null)
 
   useEffect(() => {
-    loadData()
-  }, [])
-
-  const loadData = async () => {
-    try {
-      const t = await window.ipcRenderer.invoke('get-tags')
-      const p = await window.ipcRenderer.invoke('get-projects')
-      setTags(t)
-      setProjects(p)
-    } catch (err) {
-      console.error('Failed to load tags data:', err)
-    } finally {
-      setIsLoading(false)
+    if (!isLoaded) {
+      refresh()
     }
-  }
+  }, [isLoaded, refresh])
 
   const handleCreateTag = async () => {
     if (!newTagName.trim()) return
     await window.ipcRenderer.invoke('create-tag', { name: newTagName.trim(), color: newTagColor })
     setNewTagName('')
-    loadData()
+    await refresh()
   }
 
   const handleDeleteTag = (id: string) => {
@@ -114,8 +103,10 @@ export function TagManagement() {
     if (!editingTagId || !editTagName.trim()) return
     await window.ipcRenderer.invoke('update-tag', editingTagId, { name: editTagName.trim(), color: editTagColor })
     setEditingTagId(null)
-    loadData()
+    await refresh()
   }
+
+  const isLoading = !isLoaded
 
   if (isLoading) {
     return <TagManagementSkeleton />
@@ -266,7 +257,7 @@ export function TagManagement() {
           if (pendingDeleteTagId) {
             await window.ipcRenderer.invoke('delete-tag', pendingDeleteTagId)
             setPendingDeleteTagId(null)
-            loadData()
+            await refresh()
           }
         }}
         onCancel={() => setPendingDeleteTagId(null)}
