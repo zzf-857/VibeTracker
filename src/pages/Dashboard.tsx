@@ -169,8 +169,8 @@ export function Dashboard() {
         <StatCard index={4} icon={<Clock3 size={18} />} label="自定义状态" value={displayStatuses.length.toString()} />
       </div>
 
-      <div className="stagger-item grid grid-cols-[1.25fr_0.75fr] gap-6 flex-1 min-h-[420px]" style={{ '--stagger': 5 } as CSSProperties}>
-        <section className="glass-panel ambient-panel rounded-[30px] p-6 overflow-hidden">
+      <div className="grid grid-cols-[1.25fr_0.75fr] gap-6 flex-1 min-h-[420px]">
+        <section className="glass-panel ambient-panel stagger-item rounded-[30px] p-6 overflow-hidden" style={{ '--stagger': 5 } as CSSProperties}>
           <div className="flex items-center justify-between mb-6">
             <div>
               <h2 className="text-lg font-semibold">最近活跃项目</h2>
@@ -179,8 +179,8 @@ export function Dashboard() {
             <button onClick={() => navigate('/projects')} className="text-sm text-text-secondary hover:text-text-primary transition-colors">查看画廊</button>
           </div>
           <div className="grid grid-cols-2 gap-4">
-            {displayProjects.slice(0, 6).map((project, idx) => (
-              <InteractiveCard key={project.id} onClick={() => navigate(`/project/${project.id}`)} className="dashboard-project-card motion-card group stagger-item-fast text-left bg-bg-secondary border border-border-subtle rounded-[24px] overflow-hidden min-h-[210px] cursor-pointer" style={{ '--stagger': idx + 1 } as CSSProperties}>
+            {displayProjects.slice(0, 6).map(project => (
+              <InteractiveCard key={project.id} onClick={() => navigate(`/project/${project.id}`)} className="dashboard-project-card motion-card group text-left bg-bg-secondary border border-border-subtle rounded-[24px] overflow-hidden min-h-[210px] cursor-pointer">
                 <div className="h-24 bg-bg-tertiary overflow-hidden">
                   {getProjectCover(project) ? (
                     <SafeImage src={getProjectCover(project)} alt={`${project.name} 封面`} className="w-full h-full object-cover gallery-cover" />
@@ -205,12 +205,12 @@ export function Dashboard() {
           )}
         </section>
 
-        <aside className="flex flex-col gap-6">
+        <aside className="stagger-item flex flex-col gap-6" style={{ '--stagger': 6 } as CSSProperties}>
           <section className="glass-panel rounded-[30px] p-6 motion-card">
             <h2 className="text-lg font-semibold mb-4">近期提交流</h2>
             <div className="space-y-4">
               {commits.map(({ project, commit }, index) => (
-                <button key={commit.id} onClick={() => navigate(`/project/${project.id}`)} className="recent-stream-item block w-full text-left border-l border-border-primary pl-4 transition-all duration-[180ms] hover:border-accent-blue hover:translate-x-0.5" style={{ '--stagger': index } as CSSProperties}>
+                <button key={commit.id} onClick={() => navigate(`/project/${project.id}`)} className="recent-stream-item block w-full text-left border-l border-border-primary pl-4 transition-all duration-[180ms] hover:border-accent-blue hover:translate-x-0.5" style={{ '--stagger': index, animationDelay: `${520 + index * 42}ms` } as CSSProperties}>
                   <p className="font-medium text-sm truncate">{commit.title}</p>
                   <p className="text-xs text-text-tertiary mt-1 font-mono">{formatDateTime(commit.createdAt)} · {project.name}</p>
                 </button>
@@ -250,10 +250,10 @@ export function Dashboard() {
 function CountUpValue({ value }: { value: string }) {
   const numeric = Number(value)
   const [reducedMotion, setReducedMotion] = useState(() => window.matchMedia('(prefers-reduced-motion: reduce)').matches)
-  const [display, setDisplay] = useState(() => (window.matchMedia('(prefers-reduced-motion: reduce)').matches ? (Number.isFinite(numeric) ? numeric : 0) : 0))
-  const displayRef = useRef(display)
+  const [display, setDisplay] = useState(0)
+  const [shouldStart, setShouldStart] = useState(false)
+  const displayRef = useRef(0)
   const frameRef = useRef<number | null>(null)
-  const hasAnimatedRef = useRef(false)
 
   useEffect(() => {
     const mediaQuery = window.matchMedia('(prefers-reduced-motion: reduce)')
@@ -266,32 +266,44 @@ function CountUpValue({ value }: { value: string }) {
   }, [])
 
   useEffect(() => {
-    if (frameRef.current !== null) {
-      window.cancelAnimationFrame(frameRef.current)
-      frameRef.current = null
+    if (reducedMotion) {
+      setShouldStart(true)
+      return
     }
 
-    if (!Number.isFinite(numeric)) return
+    // Delay the start by 900ms to let page enter transitions and staggers complete beautifully
+    const timer = setTimeout(() => {
+      setShouldStart(true)
+    }, 900)
+    return () => clearTimeout(timer)
+  }, [reducedMotion])
 
+  useEffect(() => {
     if (reducedMotion) {
-      hasAnimatedRef.current = true
       displayRef.current = numeric
       setDisplay(numeric)
       return
     }
 
-    const start = hasAnimatedRef.current ? displayRef.current : 0
+    if (!shouldStart || !Number.isFinite(numeric)) return
+
+    if (frameRef.current !== null) {
+      window.cancelAnimationFrame(frameRef.current)
+      frameRef.current = null
+    }
+
+    const start = displayRef.current
     const delta = numeric - start
     if (delta === 0) return
-
-    hasAnimatedRef.current = true
 
     const startedAt = Date.now()
     const duration = 420
 
     const frame = () => {
       const progress = Math.min(1, (Date.now() - startedAt) / duration)
-      const eased = 1 - Math.pow(1 - progress, 3)
+      const eased = progress < 0.5
+        ? 2 * progress * progress
+        : 1 - Math.pow(-2 * progress + 2, 2) / 2
       const nextDisplay = Math.round(start + delta * eased)
 
       displayRef.current = nextDisplay
@@ -310,14 +322,14 @@ function CountUpValue({ value }: { value: string }) {
         frameRef.current = null
       }
     }
-  }, [numeric, reducedMotion])
+  }, [numeric, shouldStart, reducedMotion])
 
   return <>{Number.isFinite(numeric) ? display : value}</>
 }
 
 function StatCard({ icon, label, value, index }: { icon: React.ReactNode; label: string; value: string; index: number }) {
   return (
-    <div className="glass-panel motion-card stagger-item rounded-[26px] p-5" style={{ '--stagger': index } as CSSProperties}>
+    <div className="glass-panel stagger-item rounded-[26px] p-5" style={{ '--stagger': index } as CSSProperties}>
       <div className="flex items-center gap-2 text-text-secondary text-sm mb-4">
         {icon}
         {label}

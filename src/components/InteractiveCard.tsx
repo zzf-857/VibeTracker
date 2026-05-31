@@ -1,4 +1,8 @@
-import React, { useRef, useState } from 'react'
+import React, { useRef } from 'react'
+import { useGSAP } from '@gsap/react'
+import gsap from 'gsap'
+
+gsap.registerPlugin(useGSAP)
 
 interface InteractiveCardProps {
   children: React.ReactNode
@@ -10,9 +14,10 @@ interface InteractiveCardProps {
 
 export function InteractiveCard({ children, className, onClick, disabled = false, style }: InteractiveCardProps) {
   const cardRef = useRef<HTMLDivElement>(null)
-  const [tiltStyle, setTiltStyle] = useState<React.CSSProperties>({})
 
-  const handleMouseMove = (e: React.MouseEvent<HTMLDivElement>) => {
+  const { contextSafe } = useGSAP({ scope: cardRef })
+
+  const handleMouseMove = contextSafe((e: React.MouseEvent<HTMLDivElement>) => {
     if (disabled || !cardRef.current) return
     const card = cardRef.current
     const rect = card.getBoundingClientRect()
@@ -26,22 +31,34 @@ export function InteractiveCard({ children, className, onClick, disabled = false
     const rotateX = ((centerY - y) / centerY) * 6.5
     const rotateY = ((x - centerX) / centerX) * 6.5
 
-    setTiltStyle({
-      transform: `perspective(1000px) rotateX(${rotateX}deg) rotateY(${rotateY}deg) scale3d(1.008, 1.008, 1.008)`,
-      transition: 'transform 0.08s cubic-bezier(0.25, 0.46, 0.45, 0.94)',
+    gsap.to(card, {
+      transformPerspective: 1000,
+      rotationX: rotateX,
+      rotationY: rotateY,
+      scale: 1.008,
+      force3D: true, // Promotes to hardware-composited layer
+      duration: 0.15,
+      ease: 'power2.out',
+      overwrite: 'auto',
       '--sheen-x': `${(x / rect.width) * 100}%`,
       '--sheen-y': `${(y / rect.height) * 100}%`,
-    } as React.CSSProperties)
-  }
+    })
+  })
 
-  const handleMouseLeave = () => {
-    setTiltStyle({
-      transform: 'perspective(1000px) rotateX(0deg) rotateY(0deg) scale3d(1, 1, 1)',
-      transition: 'transform 0.35s cubic-bezier(0.25, 0.46, 0.45, 0.94)',
+  const handleMouseLeave = contextSafe(() => {
+    if (!cardRef.current) return
+    gsap.to(cardRef.current, {
+      rotationX: 0,
+      rotationY: 0,
+      scale: 1,
+      force3D: true,
+      duration: 0.45,
+      ease: 'power3.out',
+      overwrite: 'auto',
       '--sheen-x': '50%',
       '--sheen-y': '50%',
-    } as React.CSSProperties)
-  }
+    })
+  })
 
   return (
     <div
@@ -50,10 +67,11 @@ export function InteractiveCard({ children, className, onClick, disabled = false
       onMouseLeave={handleMouseLeave}
       onClick={onClick}
       className={className}
-      style={{ ...style, ...tiltStyle }}
+      style={style}
     >
       {children}
       <span className="card-sheen" aria-hidden="true" />
     </div>
   )
 }
+

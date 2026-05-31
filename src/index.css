@@ -39,16 +39,18 @@
   --status-completed: #63D693;
   --status-paused: #F3BB6C;
 
-  --motion-instant: 80ms;
-  --motion-fast: 120ms;
-  --motion-base: 180ms;
-  --motion-panel: 280ms;
-  --motion-page: 340ms;
+  --motion-instant: 100ms;
+  --motion-fast: 160ms;
+  --motion-base: 260ms;
+  --motion-panel: 420ms;
+  --motion-page: 560ms;
   --motion-ritual: 980ms;
 
-  --ease-standard: cubic-bezier(0.2, 0, 0, 1);
-  --ease-emphasized: cubic-bezier(0.16, 1, 0.3, 1);
+  --ease-standard: cubic-bezier(0.25, 0.1, 0.25, 1);
+  --ease-emphasized: cubic-bezier(0.22, 1, 0.36, 1);
+  --ease-spring: cubic-bezier(0.175, 0.885, 0.32, 1.04);
   --ease-press: cubic-bezier(0.3, 0, 0.2, 1);
+  --ease-exit: cubic-bezier(0.4, 0, 1, 1);
 
   --lift-card: -4px;
   --press-scale: 0.98;
@@ -183,8 +185,8 @@ body {
 }
 
 .stagger-item {
-  animation: itemRise var(--motion-panel) var(--ease-emphasized) both;
-  animation-delay: calc(var(--stagger, 0) * 55ms);
+  /* Animated via GSAP */
+  transition: none !important;
 }
 
 .ritual-confirm {
@@ -524,18 +526,27 @@ body {
 @keyframes pageEnter {
   from {
     opacity: 0;
-    transform: translateY(16px) scale(0.985);
+    transform: translateY(18px) scale(0.98);
+    filter: blur(2px);
+  }
+  40% {
+    opacity: 1;
+    filter: blur(0.5px);
   }
   to {
     opacity: 1;
-    transform: translateY(0);
+    transform: translateY(0) scale(1);
+    filter: blur(0);
   }
 }
 
 @keyframes itemRise {
   from {
     opacity: 0;
-    transform: translateY(14px) scale(0.985);
+    transform: translateY(16px) scale(0.97);
+  }
+  60% {
+    opacity: 1;
   }
   to {
     opacity: 1;
@@ -546,22 +557,34 @@ body {
 @keyframes pageEnterGallery {
   from {
     opacity: 0;
-    transform: translateY(12px) scale(0.992);
+    transform: translateY(14px) scale(0.975);
+    filter: blur(1.5px);
+  }
+  50% {
+    opacity: 1;
+    filter: blur(0);
   }
   to {
     opacity: 1;
     transform: translateY(0) scale(1);
+    filter: blur(0);
   }
 }
 
 @keyframes pageEnterDetail {
   from {
     opacity: 0;
-    transform: translateY(10px) scale(0.988);
+    transform: translateY(12px) scale(0.98);
+    filter: blur(1px);
+  }
+  45% {
+    opacity: 1;
+    filter: blur(0);
   }
   to {
     opacity: 1;
     transform: translateY(0) scale(1);
+    filter: blur(0);
   }
 }
 
@@ -569,10 +592,12 @@ body {
   from {
     opacity: 0;
     transform: translateX(8px);
+    filter: blur(1px);
   }
   to {
     opacity: 1;
     transform: translateX(0);
+    filter: blur(0);
   }
 }
 
@@ -950,65 +975,110 @@ body {
   transform: translateX(0) !important;
 }
 
-/* --- Cinematic Route Transitions --- */
+/* --- Cinematic Route Transitions (Apple-style) --- */
 .page-transition-wrapper {
   backface-visibility: hidden;
-  will-change: transform, opacity;
+  will-change: transform, opacity, filter;
+  -webkit-font-smoothing: antialiased;
 }
 
 .page-route-enter {
-  animation: pageRouteEnter var(--motion-page) var(--ease-emphasized) both;
+  opacity: 0;
   z-index: 20;
 }
 
 .page-route-exit {
-  animation: pageRouteExit var(--motion-page) var(--ease-emphasized) both;
   z-index: 10;
   pointer-events: none;
 }
 
 @keyframes pageRouteEnter {
-  from {
+  0% {
     opacity: 0;
-    transform: translateY(18px) scale(0.982);
+    transform: translateY(24px) scale(0.965);
+    filter: blur(4px);
   }
-  to {
+  35% {
+    opacity: 0.85;
+    filter: blur(1px);
+  }
+  100% {
     opacity: 1;
     transform: translateY(0) scale(1);
+    filter: blur(0);
   }
 }
 
 @keyframes pageRouteExit {
-  from {
+  0% {
     opacity: 1;
     transform: translateY(0) scale(1);
+    filter: blur(0);
   }
-  to {
+  100% {
     opacity: 0;
-    transform: translateY(-14px) scale(0.985);
+    transform: translateY(-10px) scale(0.98);
+    filter: blur(3px);
+  }
+}
+
+@keyframes pageRouteEnter {
+  0% {
+    opacity: 0;
+    transform: translateY(24px) scale(0.965);
+    filter: blur(4px);
+  }
+  35% {
+    opacity: 0.85;
+    filter: blur(1px);
+  }
+  100% {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+    filter: blur(0);
+  }
+}
+
+@keyframes pageRouteExit {
+  0% {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+    filter: blur(0);
+  }
+  100% {
+    opacity: 0;
+    transform: translateY(-10px) scale(0.98);
+    filter: blur(3px);
   }
 }
 
 /* Fast Staggered items and Horizontal entrance */
+.stagger-item {
+  transition: none !important;
+}
+
 .stagger-item-fast {
-  animation: itemRise var(--motion-base) var(--ease-emphasized) both;
-  animation-delay: calc(var(--stagger, 0) * 35ms);
+  /* Animated via GSAP */
+  transition: none !important;
 }
 
 .stagger-item-horizontal-left {
-  animation: itemSlideLeft var(--motion-panel) var(--ease-emphasized) both;
-  animation-delay: calc(var(--stagger, 0) * 45ms);
+  /* Animated via GSAP */
+  transition: none !important;
 }
 
 .stagger-item-horizontal-right {
-  animation: itemSlideRight var(--motion-panel) var(--ease-emphasized) both;
-  animation-delay: calc(var(--stagger, 0) * 45ms);
+  /* Animated via GSAP */
+  transition: none !important;
 }
 
 @keyframes itemSlideLeft {
   from {
     opacity: 0;
-    transform: translateX(-18px) scale(0.99);
+    transform: translateX(-22px) scale(0.97);
+  }
+  60% {
+    opacity: 1;
   }
   to {
     opacity: 1;
@@ -1019,12 +1089,13 @@ body {
 @keyframes itemSlideRight {
   from {
     opacity: 0;
-    transform: translateX(18px) scale(0.99);
+    transform: translateX(22px) scale(0.97);
+  }
+  60% {
+    opacity: 1;
   }
   to {
     opacity: 1;
     transform: translateX(0) scale(1);
   }
 }
-
-

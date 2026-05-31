@@ -1,5 +1,9 @@
-import type { HTMLAttributes, ReactNode } from 'react'
+import { useRef, type HTMLAttributes, type ReactNode } from 'react'
 import { cn } from '../lib/utils'
+import { useGSAP } from '@gsap/react'
+import gsap from 'gsap'
+
+gsap.registerPlugin(useGSAP)
 
 type AnimatedPageProps = HTMLAttributes<HTMLDivElement> & {
   children: ReactNode
@@ -7,9 +11,89 @@ type AnimatedPageProps = HTMLAttributes<HTMLDivElement> & {
 }
 
 export function AnimatedPage({ children, className, tone = 'standard', ...props }: AnimatedPageProps) {
+  const containerRef = useRef<HTMLDivElement>(null)
+
+  useGSAP(() => {
+    // 1. Standard Stagger Items (Cards, commit cards, etc.)
+    const staggerItems = gsap.utils.toArray('.stagger-item')
+    if (staggerItems.length > 0) {
+      gsap.fromTo(staggerItems,
+        {
+          y: 35,
+          opacity: 0,
+          scale: 0.975,
+        },
+        {
+          y: 0,
+          opacity: 1,
+          scale: 1,
+          duration: 0.6,
+          ease: 'power3.out',
+          stagger: 0.06,
+          delay: 0.35, // Delayed to let the main page finish sliding in, avoiding simultaneous CPU calculation
+          clearProps: 'all', // very important: cleans up inline transform and scale styles after completion
+          onComplete: () => {
+            staggerItems.forEach(el => (el as HTMLElement).classList.remove('stagger-item'))
+          }
+        }
+      )
+    }
+
+    // 2. Fast Stagger Items (badges, simple list items)
+    const fastItems = gsap.utils.toArray('.stagger-item-fast')
+    if (fastItems.length > 0) {
+      gsap.fromTo(fastItems,
+        {
+          y: 20,
+          opacity: 0,
+        },
+        {
+          y: 0,
+          opacity: 1,
+          duration: 0.45,
+          ease: 'power3.out',
+          stagger: 0.04,
+          delay: 0.22,
+          clearProps: 'all',
+          onComplete: () => {
+            fastItems.forEach(el => (el as HTMLElement).classList.remove('stagger-item-fast'))
+          }
+        }
+      )
+    }
+
+    // 3. Horizontal Stagger Items (left slides, timeline details)
+    const horizontalLeftItems = gsap.utils.toArray('.stagger-item-horizontal-left')
+    if (horizontalLeftItems.length > 0) {
+      gsap.fromTo(horizontalLeftItems,
+        {
+          x: -30,
+          opacity: 0,
+        },
+        {
+          x: 0,
+          opacity: 1,
+          duration: 0.5,
+          ease: 'power3.out',
+          stagger: 0.05,
+          delay: 0.28,
+          clearProps: 'all',
+          onComplete: () => {
+            horizontalLeftItems.forEach(el => (el as HTMLElement).classList.remove('stagger-item-horizontal-left'))
+          }
+        }
+      )
+    }
+  }, { scope: containerRef })
+
   return (
-    <div className={cn('page-enter motion-page-shell', `motion-page-${tone}`, className)} {...props}>
+    <div 
+      ref={containerRef}
+      className={cn('page-enter motion-page-shell', `motion-page-${tone}`, className)} 
+      {...props}
+    >
       {children}
     </div>
   )
 }
+

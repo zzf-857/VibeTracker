@@ -4,7 +4,6 @@ import { Check, ChevronDown, Search, Plus, Image, Sparkles, Folder, X } from 'lu
 import { useNavigate } from 'react-router-dom'
 import { AnimatedPage } from '../components/AnimatedPage'
 import { SafeImage } from '../components/SafeImage'
-import { getStaggerStyle } from '../lib/motion'
 import { formatDateTime, getProjectCover, getRecentCommit } from '../lib/projectView'
 import { MOCK_MODE_LABEL, mockProjects, mockStatuses, mockTags } from '../lib/mockData'
 import { Skeleton } from '../components/Skeleton'
@@ -246,7 +245,7 @@ export function ProjectList() {
         </section>
       )}
 
-      <div className="glass-panel motion-card stagger-item rounded-[28px] p-3 flex items-center justify-between gap-4" style={{ '--stagger': 1 } as CSSProperties}>
+      <div className="glass-panel stagger-item rounded-[28px] p-3 flex items-center justify-between gap-4" style={{ '--stagger': 1 } as CSSProperties}>
         <div className="flex items-center gap-2 overflow-x-auto px-1">
           <button
             onClick={() => setActiveTag(null)}
@@ -277,8 +276,8 @@ export function ProjectList() {
       </div>
 
       <div key={activeTag ?? 'all'} className="gallery-grid grid grid-cols-3 gap-6 pb-10">
-        {filteredProjects.map((project, index) => (
-          <ProjectGalleryCard key={project.id} project={project} index={index} onOpen={() => navigate(`/project/${project.id}`)} />
+        {filteredProjects.map((project) => (
+          <ProjectGalleryCard key={project.id} project={project} onOpen={() => navigate(`/project/${project.id}`)} />
         ))}
       </div>
 
@@ -295,15 +294,14 @@ export function ProjectList() {
   )
 }
 
-function ProjectGalleryCard({ project, onOpen, index }: { project: Project; onOpen: () => void; index: number }) {
+function ProjectGalleryCard({ project, onOpen }: { project: Project; onOpen: () => void }) {
   const cover = getProjectCover(project)
   const recentCommit = getRecentCommit(project)
 
   return (
     <InteractiveCard
       onClick={onOpen}
-      className="group text-left glass-panel ambient-panel motion-card gallery-card gallery-card-enter rounded-[30px] overflow-hidden min-h-[360px] flex flex-col cursor-pointer"
-      style={getStaggerStyle(index + 2)}
+      className="group text-left glass-panel ambient-panel motion-card gallery-card stagger-item rounded-[30px] overflow-hidden min-h-[360px] flex flex-col cursor-pointer"
     >
       {cover ? (
         <div className="h-44 overflow-hidden bg-bg-tertiary">

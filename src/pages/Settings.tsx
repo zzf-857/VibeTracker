@@ -308,7 +308,7 @@ export function Settings() {
         </section>
 
         <aside className="flex flex-col gap-6">
-          <section className="glass-panel motion-card rounded-[32px] p-6 stagger-item" style={{ '--stagger': 2 } as CSSProperties}>
+          <section className="glass-panel rounded-[32px] p-6 stagger-item" style={{ '--stagger': 2 } as CSSProperties}>
             <h2 className="text-lg font-semibold mb-4">新增状态</h2>
             <div className="space-y-3">
               <input value={newName} onChange={e => setNewName(e.target.value)} className="motion-focus w-full bg-bg-secondary border border-border-subtle rounded-2xl px-4 py-3 text-sm outline-none" placeholder="状态名称" />
@@ -327,7 +327,7 @@ export function Settings() {
             </div>
           </section>
 
-          <section className="glass-panel motion-card rounded-[32px] p-6 border-accent-orange/30 stagger-item" style={{ '--stagger': 3 } as CSSProperties}>
+          <section className="glass-panel rounded-[32px] p-6 border-accent-orange/30 stagger-item" style={{ '--stagger': 3 } as CSSProperties}>
             <div className="flex gap-3">
               <AlertTriangle size={18} className="text-accent-orange flex-shrink-0 mt-0.5" />
               <div>

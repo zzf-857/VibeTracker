@@ -1,9 +1,13 @@
-import React, { useEffect, useState } from 'react'
+import React, { useEffect, useState, useRef } from 'react'
 import { useLocation, useOutlet } from 'react-router-dom'
 import { Sidebar } from './Sidebar'
 import { ParticleEmitterProvider } from './ParticleEmitter'
 import { TooltipProvider } from './CustomTooltip'
 import { cn } from '../lib/utils'
+import { useGSAP } from '@gsap/react'
+import gsap from 'gsap'
+
+gsap.registerPlugin(useGSAP)
 
 interface RenderedPage {
   key: string
@@ -15,6 +19,8 @@ export function Layout() {
   const location = useLocation()
   const outlet = useOutlet()
   const [renderedPages, setRenderedPages] = useState<RenderedPage[]>([])
+  const containerRef = useRef<HTMLDivElement>(null)
+  const lastAnimatedKeyRef = useRef<string | null>(null)
 
   useEffect(() => {
     if (!outlet) return
@@ -35,10 +41,57 @@ export function Layout() {
     if (exiting.length > 0) {
       const timer = setTimeout(() => {
         setRenderedPages(prev => prev.filter(p => p.phase !== 'exit'))
-      }, 340)
+      }, 450) // Aligned with the 450ms transition duration
       return () => clearTimeout(timer)
     }
   }, [renderedPages])
+
+  useGSAP(() => {
+    // 1. Ensure the new page is actually mounted and in the 'enter' phase in the DOM
+    const hasEnteringPage = renderedPages.some(p => p.key === location.pathname && p.phase === 'enter')
+    if (!hasEnteringPage) return
+
+    // 2. Animate Entering Page
+    const enteringEl = containerRef.current?.querySelector('.page-route-enter')
+    if (enteringEl && lastAnimatedKeyRef.current !== location.pathname) {
+      lastAnimatedKeyRef.current = location.pathname
+      gsap.killTweensOf(enteringEl)
+      gsap.fromTo(enteringEl,
+        {
+          opacity: 0,
+          y: 22,
+          scale: 0.982,
+        },
+        {
+          opacity: 1,
+          y: 0,
+          scale: 1,
+          duration: 0.45,
+          ease: 'power3.out',
+        }
+      )
+    }
+
+    // 3. Animate Exiting Page
+    const exitingEl = containerRef.current?.querySelector('.page-route-exit')
+    if (exitingEl) {
+      gsap.killTweensOf(exitingEl)
+      gsap.fromTo(exitingEl,
+        {
+          opacity: 1,
+          y: 0,
+          scale: 1,
+        },
+        {
+          opacity: 0,
+          y: -10,
+          scale: 0.99,
+          duration: 0.22, // Decisive exit: vanishes quickly to free up GPU composición layers
+          ease: 'power2.out',
+        }
+      )
+    }
+  }, { dependencies: [renderedPages, location.pathname], scope: containerRef })
 
   return (
     <ParticleEmitterProvider>
@@ -46,7 +99,7 @@ export function Layout() {
         <div className="flex h-screen w-full overflow-hidden text-text-primary">
           <Sidebar />
           <main className="flex-1 h-full overflow-hidden flex flex-col relative z-[1]">
-            <div className="flex-1 w-full relative overflow-hidden">
+            <div className="flex-1 w-full relative overflow-hidden" ref={containerRef}>
               {renderedPages.map(page => (
                 <div
                   key={page.key}
@@ -70,5 +123,6 @@ export function Layout() {
     </ParticleEmitterProvider>
   )
 }
+
 
 
