@@ -950,3 +950,81 @@ body {
   transform: translateX(0) !important;
 }
 
+/* --- Cinematic Route Transitions --- */
+.page-transition-wrapper {
+  backface-visibility: hidden;
+  will-change: transform, opacity;
+}
+
+.page-route-enter {
+  animation: pageRouteEnter var(--motion-page) var(--ease-emphasized) both;
+  z-index: 20;
+}
+
+.page-route-exit {
+  animation: pageRouteExit var(--motion-page) var(--ease-emphasized) both;
+  z-index: 10;
+  pointer-events: none;
+}
+
+@keyframes pageRouteEnter {
+  from {
+    opacity: 0;
+    transform: translateY(18px) scale(0.982);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+@keyframes pageRouteExit {
+  from {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+  to {
+    opacity: 0;
+    transform: translateY(-14px) scale(0.985);
+  }
+}
+
+/* Fast Staggered items and Horizontal entrance */
+.stagger-item-fast {
+  animation: itemRise var(--motion-base) var(--ease-emphasized) both;
+  animation-delay: calc(var(--stagger, 0) * 35ms);
+}
+
+.stagger-item-horizontal-left {
+  animation: itemSlideLeft var(--motion-panel) var(--ease-emphasized) both;
+  animation-delay: calc(var(--stagger, 0) * 45ms);
+}
+
+.stagger-item-horizontal-right {
+  animation: itemSlideRight var(--motion-panel) var(--ease-emphasized) both;
+  animation-delay: calc(var(--stagger, 0) * 45ms);
+}
+
+@keyframes itemSlideLeft {
+  from {
+    opacity: 0;
+    transform: translateX(-18px) scale(0.99);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(0) scale(1);
+  }
+}
+
+@keyframes itemSlideRight {
+  from {
+    opacity: 0;
+    transform: translateX(18px) scale(0.99);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(0) scale(1);
+  }
+}
+
+

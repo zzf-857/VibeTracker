@@ -179,8 +179,8 @@ export function Dashboard() {
             <button onClick={() => navigate('/projects')} className="text-sm text-text-secondary hover:text-text-primary transition-colors">查看画廊</button>
           </div>
           <div className="grid grid-cols-2 gap-4">
-            {displayProjects.slice(0, 6).map(project => (
-              <InteractiveCard key={project.id} onClick={() => navigate(`/project/${project.id}`)} className="dashboard-project-card motion-card group text-left bg-bg-secondary border border-border-subtle rounded-[24px] overflow-hidden min-h-[210px] cursor-pointer">
+            {displayProjects.slice(0, 6).map((project, idx) => (
+              <InteractiveCard key={project.id} onClick={() => navigate(`/project/${project.id}`)} className="dashboard-project-card motion-card group stagger-item-fast text-left bg-bg-secondary border border-border-subtle rounded-[24px] overflow-hidden min-h-[210px] cursor-pointer" style={{ '--stagger': idx + 1 } as CSSProperties}>
                 <div className="h-24 bg-bg-tertiary overflow-hidden">
                   {getProjectCover(project) ? (
                     <SafeImage src={getProjectCover(project)} alt={`${project.name} 封面`} className="w-full h-full object-cover gallery-cover" />

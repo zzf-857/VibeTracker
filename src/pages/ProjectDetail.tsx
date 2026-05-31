@@ -560,7 +560,7 @@ export function ProjectDetail() {
 
           <div className="overflow-y-auto max-h-[540px] pr-2 custom-scrollbar">
             <div className="relative pl-7 space-y-5 before:absolute before:left-[7px] before:top-2 before:bottom-2 before:w-[2px] before:bg-border-primary">
-              {commits.map((commit) => (
+              {commits.map((commit, index) => (
                 <CommitCard
                   key={commit.id}
                   commit={commit}
@@ -568,6 +568,7 @@ export function ProjectDetail() {
                   onDelete={() => setPendingDeleteCommitId(commit.id)}
                   onSetCover={(imagePath) => setCoverFromPath(imagePath)}
                   isNew={commit.id === ritualCommitId}
+                  index={index}
                 />
               ))}
               {commits.length === 0 && (
@@ -624,8 +625,8 @@ export function ProjectDetail() {
             </div>
           )}
           <div className="space-y-3 overflow-y-auto max-h-[400px] pr-1 custom-scrollbar flex-1">
-            {noteblocks.map(note => (
-              <div key={note.id} className={cn("bg-bg-secondary border border-border-subtle rounded-2xl p-4 group item-exit-transition", deletingNoteIds.includes(note.id) && "item-exit-active")}>
+            {noteblocks.map((note, index) => (
+              <div key={note.id} className={cn("bg-bg-secondary border border-border-subtle rounded-2xl p-4 group item-exit-transition stagger-item-horizontal-left", deletingNoteIds.includes(note.id) && "item-exit-active")} style={{ '--stagger': index + 2 } as CSSProperties}>
                 {editingNoteId === note.id ? (
                   <div>
                     <textarea
@@ -696,8 +697,8 @@ export function ProjectDetail() {
             </div>
           )}
           <div className="space-y-2 overflow-y-auto max-h-[400px] pr-1 custom-scrollbar flex-1">
-            {todos.map(todo => (
-              <div key={todo.id} className={cn("flex items-center gap-3 bg-bg-secondary border border-border-subtle rounded-2xl px-4 py-3 group transition-colors hover:bg-bg-tertiary item-exit-transition", deletingTodoIds.includes(todo.id) && "item-exit-active")}>
+            {todos.map((todo, index) => (
+              <div key={todo.id} className={cn("flex items-center gap-3 bg-bg-secondary border border-border-subtle rounded-2xl px-4 py-3 group transition-colors hover:bg-bg-tertiary item-exit-transition stagger-item-horizontal-right", deletingTodoIds.includes(todo.id) && "item-exit-active")} style={{ '--stagger': index + 2 } as CSSProperties}>
                 <button
                   onClick={(e) => toggleTodo(todo, e)}
                   disabled={isMock}
@@ -755,11 +756,14 @@ export function ProjectDetail() {
   )
 }
 
-function CommitCard({ commit, onEdit, onDelete, onSetCover, isNew }: { commit: ProjectCommit; onEdit: () => void; onDelete: () => void; onSetCover: (path: string) => void; isNew?: boolean }) {
+function CommitCard({ commit, onEdit, onDelete, onSetCover, isNew, index }: { commit: ProjectCommit; onEdit: () => void; onDelete: () => void; onSetCover: (path: string) => void; isNew?: boolean; index: number }) {
   const { showPreview } = useImagePreview()
 
   return (
-    <article className={`motion-card commit-card relative bg-bg-secondary border border-border-subtle rounded-[24px] p-5 transition-all duration-[220ms] hover:bg-bg-tertiary before:absolute before:-left-[31px] before:top-6 before:w-4 before:h-4 before:rounded-full before:bg-status-completed before:border-[4px] before:border-[#111318] ${isNew ? 'commit-card-new ritual-timeline' : ''}`}>
+    <article
+      className={`motion-card commit-card stagger-item-fast relative bg-bg-secondary border border-border-subtle rounded-[24px] p-5 transition-all duration-[220ms] hover:bg-bg-tertiary before:absolute before:-left-[31px] before:top-6 before:w-4 before:h-4 before:rounded-full before:bg-status-completed before:border-[4px] before:border-[#111318] ${isNew ? 'commit-card-new ritual-timeline' : ''}`}
+      style={{ '--stagger': index + 1 } as CSSProperties}
+    >
       <div className="flex items-start justify-between gap-4">
         <div>
           <h3 className="font-semibold text-lg">{commit.title}</h3>
