@@ -40,15 +40,33 @@ function runTransaction<T>(db: SqliteDatabase, action: () => T): T {
   }
 }
 
+const WINDOWS_UNLINK_RETRY_DELAYS_MS = [40, 80, 160, 320, 640, 1_000]
+const WINDOWS_RETRIABLE_UNLINK_CODES = new Set(['EACCES', 'EBUSY', 'EPERM'])
+
+async function unlinkManagedFile(filePath: string) {
+  for (let attempt = 0; ; attempt += 1) {
+    try {
+      await fs.unlink(filePath)
+      return null
+    } catch (error) {
+      const code = (error as NodeJS.ErrnoException).code
+      if (code === 'ENOENT') return null
+      const retryDelay = WINDOWS_UNLINK_RETRY_DELAYS_MS[attempt]
+      if (process.platform !== 'win32' || !code || !WINDOWS_RETRIABLE_UNLINK_CODES.has(code) || retryDelay === undefined) {
+        return error
+      }
+      const stillAFile = await fs.stat(filePath).then(stat => stat.isFile()).catch(() => false)
+      if (!stillAFile) return error
+      await new Promise(resolve => setTimeout(resolve, retryDelay))
+    }
+  }
+}
+
 async function removeFiles(paths: string[]) {
   const failures: Array<{ path: string; reason: string }> = []
   for (const filePath of paths) {
-    try {
-      await fs.unlink(filePath)
-    } catch (error) {
-      const code = (error as NodeJS.ErrnoException).code
-      if (code !== 'ENOENT') failures.push({ path: filePath, reason: error instanceof Error ? error.message : String(error) })
-    }
+    const error = await unlinkManagedFile(filePath)
+    if (error) failures.push({ path: filePath, reason: error instanceof Error ? error.message : String(error) })
   }
   return failures
 }
