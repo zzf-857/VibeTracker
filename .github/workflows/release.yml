@@ -20,7 +20,7 @@ jobs:
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: 24
+          node-version: 22
           cache: npm
 
       - name: Setup Python
@@ -45,6 +45,9 @@ jobs:
 
       - name: Run lint
         run: npm run lint
+
+      - name: Rebuild native dependencies for Electron
+        run: npx electron-builder install-app-deps
 
       - name: Run Electron E2E
         run: npm run test:e2e
