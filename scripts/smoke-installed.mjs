@@ -117,7 +117,7 @@ async function stopInstalledProcesses() {
   await runIsolatedPowerShell(`
     Get-CimInstance Win32_Process -Filter "Name = 'VibeTracker.exe'" |
       Where-Object { [string]::Equals($_.ExecutablePath, $env:VIBETRACKER_SMOKE_EXECUTABLE, [System.StringComparison]::OrdinalIgnoreCase) } |
-      ForEach-Object { Stop-Process -Id $_.ProcessId -Force -ErrorAction Stop }
+      ForEach-Object { Stop-Process -Id $_.ProcessId -Force -ErrorAction SilentlyContinue }
   `)
 }
 
@@ -147,7 +147,7 @@ async function stopIsolatedUpdaterInstallers() {
         $_.ExecutablePath -and
         $_.ExecutablePath.StartsWith($env:VIBETRACKER_SMOKE_LOCAL_APP_DATA, [System.StringComparison]::OrdinalIgnoreCase)
       } |
-      ForEach-Object { Stop-Process -Id $_.ProcessId -Force -ErrorAction Stop }
+      ForEach-Object { Stop-Process -Id $_.ProcessId -Force -ErrorAction SilentlyContinue }
   `)
 }
 

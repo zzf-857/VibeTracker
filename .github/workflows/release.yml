@@ -73,6 +73,11 @@ jobs:
       - name: Prepare release notes
         shell: bash
         run: |
+          git fetch --force origin "+refs/tags/${GITHUB_REF_NAME}:refs/tags/${GITHUB_REF_NAME}"
+          if [ "$(git cat-file -t "refs/tags/${GITHUB_REF_NAME}")" != "tag" ]; then
+            echo "${GITHUB_REF_NAME} is not an annotated tag" >&2
+            exit 1
+          fi
           git for-each-ref "refs/tags/${GITHUB_REF_NAME}" --format='%(contents)' > release-notes.md
           if [ ! -s release-notes.md ]; then
             echo "VibeTracker automated release ${GITHUB_REF_NAME}" > release-notes.md
