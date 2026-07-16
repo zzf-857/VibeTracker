@@ -1,6 +1,6 @@
 {
   "name": "vibetracker",
-  "version": "0.1.1",
+  "version": "0.1.2",
   "description": "A PC desktop application for managing local project progress",
   "main": "dist-electron/main.js",
   "scripts": {
@@ -19,6 +19,7 @@
     "package": "npm run build && electron-builder --win",
     "package:smoke": "npm run package -- --publish never && node scripts/smoke-packaged.mjs",
     "package:installed-smoke": "npm run package -- --publish never && node scripts/smoke-installed.mjs",
+    "test:update:online": "set VIBETRACKER_SMOKE_ONLINE_UPDATE=1&& node scripts/smoke-installed.mjs",
     "dist:win": "npm run package"
   },
   "dependencies": {

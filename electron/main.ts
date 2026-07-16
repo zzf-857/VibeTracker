@@ -185,7 +185,7 @@ function setupAutoUpdater() {
       if (gitSyncScheduler) await gitSyncScheduler.stop()
       if (processManager) await processManager.stopAll()
       shutdownReady = true
-      autoUpdater.quitAndInstall(false, true)
+      autoUpdater.quitAndInstall(true, true)
       return { success: true }
     } catch (error) {
       shutdownStarted = false
