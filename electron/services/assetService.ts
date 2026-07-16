@@ -165,14 +165,15 @@ export class AssetService {
     const filePath = path.join(directory, `${Date.now()}-${safeStem}-${crypto.randomUUID()}.${extension}`)
     await fs.writeFile(filePath, buffer, { flag: 'wx' })
     try {
+      const canonicalPath = await fs.realpath(filePath)
       this.db.prepare(`
         INSERT INTO managed_assets (id, path, kind, createdAt) VALUES (?, ?, 'screenshot', ?)
-      `).run(crypto.randomUUID(), filePath, Date.now())
+      `).run(crypto.randomUUID(), canonicalPath, Date.now())
+      return canonicalPath
     } catch (error) {
       await fs.unlink(filePath).catch(() => undefined)
       throw error
     }
-    return filePath
   }
 
   attachToRecord(filePath: string, projectId: string, recordId: string) {

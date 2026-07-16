@@ -143,6 +143,51 @@ test('asset paths must be explicitly authorized before persistence unless they b
   }
 })
 
+test('managed asset aliases preserve their tracked path while new saves use canonical paths', async t => {
+  const directory = fs.mkdtempSync(path.join(os.tmpdir(), 'vibetracker-asset-alias-'))
+  const dbPath = path.join(directory, 'test.db')
+  const actualDirectory = path.join(directory, 'actual')
+  const aliasDirectory = path.join(directory, 'alias')
+  fs.mkdirSync(actualDirectory)
+  try {
+    fs.symlinkSync(actualDirectory, aliasDirectory, process.platform === 'win32' ? 'junction' : 'dir')
+  } catch (error) {
+    const code = (error as NodeJS.ErrnoException).code
+    if (code === 'EPERM' || code === 'EACCES') {
+      t.skip('当前 Windows 权限不允许创建目录联接')
+      fs.rmSync(directory, { recursive: true, force: true })
+      return
+    }
+    throw error
+  }
+  const trackedAlias = path.join(aliasDirectory, 'tracked.png')
+  fs.writeFileSync(path.join(actualDirectory, 'tracked.png'), 'managed')
+  const db = new DatabaseSync(dbPath)
+  try {
+    migrateDatabase(db, { dbPath })
+    db.prepare(`
+      INSERT INTO managed_assets (id, path, kind, createdAt) VALUES (?, ?, 'screenshot', ?)
+    `).run('managed-alias', trackedAlias, 1)
+    assert.equal(authorizeAssetPathForPersistence(db as never, trackedAlias), trackedAlias)
+
+    const service = new AssetService(db as never, {
+      getPublic: async () => ({ screenshotsDirectory: aliasDirectory }),
+    } as never)
+    const savedPath = await service.saveImageData(
+      'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAusB9WlFhE0AAAAASUVORK5CYII=',
+      'canonical.png',
+    )
+    assert.equal(savedPath, fs.realpathSync.native(savedPath))
+    assert.equal(
+      (db.prepare('SELECT path FROM managed_assets WHERE path = ?').get(savedPath) as { path: string }).path,
+      savedPath,
+    )
+  } finally {
+    db.close()
+    fs.rmSync(directory, { recursive: true, force: true })
+  }
+})
+
 test('asset persistence rejects missing, unsupported, and oversized files', () => {
   const directory = fs.mkdtempSync(path.join(os.tmpdir(), 'vibetracker-asset-invalid-'))
   const dbPath = path.join(directory, 'test.db')

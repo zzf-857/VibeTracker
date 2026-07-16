@@ -50,17 +50,21 @@ function isPreviewAuthorized(keys: string[]) {
   return false
 }
 
-function hasPersistedReference(db: Database.Database, keys: string[]) {
+function persistedReferencePath(db: Database.Database, keys: string[]) {
   for (const filePath of keys) {
     const referenced = db.prepare(`
-      SELECT 1 FROM managed_assets WHERE path = ?
-      UNION ALL SELECT 1 FROM projects WHERE coverImagePath = ?
-      UNION ALL SELECT 1 FROM development_record_images WHERE imagePath = ?
+      SELECT path FROM managed_assets WHERE path = ?
+      UNION ALL SELECT coverImagePath AS path FROM projects WHERE coverImagePath = ?
+      UNION ALL SELECT imagePath AS path FROM development_record_images WHERE imagePath = ?
       LIMIT 1
-    `).get(filePath, filePath, filePath)
-    if (referenced) return true
+    `).get(filePath, filePath, filePath) as { path?: string } | undefined
+    if (referenced?.path) return referenced.path
   }
-  return false
+  return ''
+}
+
+function hasPersistedReference(db: Database.Database, keys: string[]) {
+  return Boolean(persistedReferencePath(db, keys))
 }
 
 function projectRoots(db: Database.Database, projectId?: string) {
@@ -109,9 +113,10 @@ export function authorizeAssetPathForPersistence(
   const canonical = existingImagePath(candidatePath)
   if (!canonical) throw new Error('图片路径不存在、不是受支持的图片，或文件超过 40 MB')
   const keys = pathKeys(candidatePath, canonical)
+  const persistedPath = persistedReferencePath(db, keys)
+  if (persistedPath) return persistedPath
   if (
     isPreviewAuthorized(keys)
-    || hasPersistedReference(db, keys)
     || isWithinRoots(canonical, [...projectRoots(db, options.projectId), ...(options.roots || [])])
   ) return canonical
   throw new Error('图片路径未通过授权；请使用图片选择器，或选择项目仓库内的图片')
