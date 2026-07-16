@@ -129,7 +129,7 @@ test('asset paths must be explicitly authorized before persistence unless they b
     )
     assert.equal(
       authorizeAssetPathForPersistence(db as never, managedImage, { projectId: 'project-1' }),
-      fs.realpathSync.native(managedImage),
+      managedImage,
     )
 
     authorizeAssetPaths([selectedImage], 60_000)
