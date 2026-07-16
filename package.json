@@ -1,6 +1,6 @@
 {
   "name": "vibetracker",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "description": "A PC desktop application for managing local project progress",
   "main": "dist-electron/main.js",
   "scripts": {
