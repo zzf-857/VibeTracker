@@ -10,13 +10,6 @@ function git(directory: string, args: string[]) {
   return execFileSync('git', ['-C', directory, ...args], { encoding: 'utf8', windowsHide: true }).trim()
 }
 
-function sameCanonicalPath(left: string, right: string) {
-  const canonicalLeft = fs.realpathSync(left)
-  const canonicalRight = fs.realpathSync(right)
-  if (process.platform !== 'win32') return canonicalLeft === canonicalRight
-  return canonicalLeft.toLocaleLowerCase('en-US') === canonicalRight.toLocaleLowerCase('en-US')
-}
-
 test('Git inspection parses facts and incremental scans return only new commits', async () => {
   const directory = fs.mkdtempSync(path.join(os.tmpdir(), 'vibetracker-git-scan-'))
   try {
@@ -126,7 +119,7 @@ test('launch discovery recommends structured commands for common non-Node projec
     assert.ok(commands.includes('go run .'))
     assert.ok(commands.includes('dotnet run --project Fixture.csproj'))
     assert.ok(commands.includes('swift run'))
-    assert.ok(inspection.launchCandidates.every(item => Array.isArray(item.args) && sameCanonicalPath(item.cwd, directory)))
+    assert.ok(inspection.launchCandidates.every(item => Array.isArray(item.args) && item.cwd === inspection.canonicalPath))
     assert.ok(inspection.launchCandidates.every(item => /仅推荐，不会自动执行/.test(item.reason)))
 
     fs.writeFileSync(path.join(fastApiDirectory, 'main.py'), 'from fastapi import FastAPI\napi = FastAPI()\n')
