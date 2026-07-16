@@ -6,7 +6,7 @@ from pathlib import Path
 
 
 WORKSPACE = Path(__file__).resolve().parents[1]
-DB_PATH = Path.home() / "AppData" / "Roaming" / "ai-tools-manager" / "devtracker.db"
+DB_PATH = Path.home() / "AppData" / "Roaming" / "VibeTracker" / "vibetracker.db"
 ASSET_DIR = WORKSPACE / "src" / "assets" / "demo-screenshots"
 
 NOW = int(time.time() * 1000)
@@ -149,8 +149,8 @@ def main() -> None:
             updated_at = NOW - project["updated_ago"] * DAY
             cur.execute(
                 """
-                INSERT INTO projects (id, name, description, path, repoUrl, status, progress, coverImagePath, createdAt, updatedAt)
-                VALUES (?, ?, ?, ?, ?, ?, 0, ?, ?, ?)
+                INSERT INTO projects (id, name, description, path, repoUrl, status, coverImagePath, createdAt, updatedAt)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
                 """,
                 (
                     project["id"],
@@ -176,14 +176,16 @@ def main() -> None:
                 commit_at = NOW - days_ago * DAY - index * 70 * 60 * 1000
                 cur.execute(
                     """
-                    INSERT INTO project_commits (id, projectId, title, description, progressDelta, createdAt, updatedAt)
-                    VALUES (?, ?, ?, ?, ?, ?, ?)
+                    INSERT INTO development_records (
+                      id, projectId, title, description, source, reviewStatus,
+                      userEditedAt, createdAt, updatedAt
+                    ) VALUES (?, ?, ?, ?, 'manual', 'accepted', ?, ?, ?)
                     """,
-                    (commit_id, project["id"], title, description, 8 if index == 1 else 0, commit_at, commit_at),
+                    (commit_id, project["id"], title, description, commit_at, commit_at, commit_at),
                 )
                 cur.execute(
                     """
-                    INSERT INTO commit_images (id, commitId, imagePath, caption, sortIndex, createdAt)
+                    INSERT INTO development_record_images (id, recordId, imagePath, caption, sortIndex, createdAt)
                     VALUES (?, ?, ?, ?, 0, ?)
                     """,
                     (f"{commit_id}-image-1", commit_id, image_path(image), title, commit_at),

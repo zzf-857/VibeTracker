@@ -830,7 +830,6 @@ body {
     scroll-behavior: auto !important;
     transition-property: opacity, color, background-color, border-color !important;
     transition-duration: 1ms !important;
-    transform: none !important;
   }
 
   #root::before,
@@ -983,7 +982,9 @@ body {
 }
 
 .page-route-enter {
-  opacity: 0;
+  /* The route must remain readable even when the animation hook fails. GSAP
+     applies its own starting opacity synchronously when animation is active. */
+  opacity: 1;
   z-index: 20;
 }
 
@@ -1098,4 +1099,9 @@ body {
     opacity: 1;
     transform: translateX(0) scale(1);
   }
+}
+
+/* Keep review controls clear of the sticky AI dialog footer. */
+section[aria-labelledby='ai-sync-title'] > div {
+  padding-bottom: 6rem;
 }

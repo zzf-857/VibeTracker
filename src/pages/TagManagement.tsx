@@ -36,7 +36,7 @@ function TagManagementSkeleton() {
         <Skeleton className="h-10 w-28 rounded-lg ml-auto" />
       </div>
       {/* 标签列表网格骨架 */}
-      <div className="grid grid-cols-2 gap-6 flex-1 pr-2 pb-10">
+      <div className="grid grid-cols-2 gap-6 flex-1 pt-3 pr-2 pb-10">
         {[1, 2, 3, 4].map(i => (
           <div key={i} className="bg-bg-secondary rounded-[24px] border border-border-primary p-6 flex flex-col gap-5">
             <div className="flex justify-between items-start">
@@ -151,7 +151,7 @@ export function TagManagement() {
       </div>
 
       {/* Tags Grid */}
-      <div className="flex-1 overflow-y-auto pr-2 pb-10">
+      <div className="flex-1 overflow-y-auto pt-3 pr-2 pb-10">
         <div className="grid grid-cols-2 gap-6">
           {tags.map((tag, tagIndex) => {
             const linkedProjects = projects.filter(p => p.tags?.some(t => t.id === tag.id))

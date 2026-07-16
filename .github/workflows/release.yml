@@ -1,0 +1,88 @@
+name: Build and Release
+
+on:
+  push:
+    tags:
+      - 'v*'
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    name: Build & Release Windows App
+    runs-on: windows-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.x'
+
+      - name: Verify tag matches package version
+        shell: pwsh
+        run: |
+          $packageVersion = (node -p "require('./package.json').version").Trim()
+          $tagVersion = $env:GITHUB_REF_NAME -replace '^v', ''
+          if ($packageVersion -ne $tagVersion) {
+            throw "Tag $env:GITHUB_REF_NAME does not match package.json version $packageVersion"
+          }
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Run unit tests
+        run: npm run test:unit
+
+      - name: Run lint
+        run: npm run lint
+
+      - name: Run Electron E2E
+        run: npm run test:e2e
+
+      - name: Build and package
+        run: npm run package -- --publish never
+
+      - name: Verify release assets
+        shell: pwsh
+        run: |
+          if (-not (Test-Path "release/latest.yml")) {
+            throw "release/latest.yml was not generated"
+          }
+          if (-not (Get-ChildItem -Path "release" -Filter "VibeTracker-Setup-*.exe")) {
+            throw "VibeTracker setup exe was not generated"
+          }
+          if (-not (Get-ChildItem -Path "release" -Filter "*.blockmap")) {
+            throw "release blockmap was not generated"
+          }
+
+      - name: Prepare release notes
+        shell: bash
+        run: |
+          git for-each-ref "refs/tags/${GITHUB_REF_NAME}" --format='%(contents)' > release-notes.md
+          if [ ! -s release-notes.md ]; then
+            echo "VibeTracker automated release ${GITHUB_REF_NAME}" > release-notes.md
+          fi
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          repository: zzf-857/VibeTracker
+          body_path: release-notes.md
+          files: |
+            release/*.exe
+            release/*.blockmap
+            release/*.yml
+          draft: false
+          prerelease: false
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

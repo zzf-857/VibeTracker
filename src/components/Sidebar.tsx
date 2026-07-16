@@ -1,87 +1,24 @@
 import { useEffect, useState } from 'react'
+import { FolderKanban, Home, Settings } from 'lucide-react'
 import { NavLink, useLocation } from 'react-router-dom'
-import { LayoutDashboard, FolderKanban, Tags, Settings } from 'lucide-react'
 import { cn } from '../lib/utils'
 
 export function Sidebar() {
   const location = useLocation()
-  const navItems = [
-    { icon: LayoutDashboard, label: '仪表板', path: '/', match: (pathname: string) => pathname === '/' },
-    { icon: FolderKanban, label: '项目列表', path: '/projects', match: (pathname: string) => pathname.startsWith('/projects') || pathname.startsWith('/project/') },
-    { icon: Tags, label: '标签管理', path: '/tags', match: (pathname: string) => pathname.startsWith('/tags') },
-    { icon: Settings, label: '设置', path: '/settings', match: (pathname: string) => pathname.startsWith('/settings') },
+  const [appVersion, setAppVersion] = useState('0.1.0')
+  useEffect(() => { void window.vibe.app.getVersion().then(info => setAppVersion(info.version)).catch(() => undefined) }, [])
+  const items = [
+    { icon: Home, label: '首页', path: '/', active: (pathname: string) => pathname === '/' },
+    { icon: FolderKanban, label: '项目', path: '/projects', active: (pathname: string) => pathname.startsWith('/project') },
+    { icon: Settings, label: '设置', path: '/settings', active: (pathname: string) => pathname.startsWith('/settings') || pathname.startsWith('/tags') },
   ]
-  const activeIndex = navItems.findIndex(item => item.match(location.pathname))
-  const indicatorIndex = Math.max(0, activeIndex)
-
-  const [prevIndex, setPrevIndex] = useState(indicatorIndex)
-  const [isNavigating, setIsNavigating] = useState(false)
-  const [clickActivePath, setClickActivePath] = useState<string | null>(null)
-
-  useEffect(() => {
-    if (indicatorIndex !== prevIndex) {
-      setIsNavigating(true)
-      const timer = setTimeout(() => {
-        setIsNavigating(false)
-        setPrevIndex(indicatorIndex)
-      }, 380)
-      return () => clearTimeout(timer)
-    }
-  }, [indicatorIndex, prevIndex])
-
   return (
-    <aside className="w-[92px] h-full bg-sidebar/80 backdrop-blur-2xl flex flex-col py-6 px-4 flex-shrink-0 relative z-10 border-r border-border-primary">
-      <div className="flex items-center justify-center mb-9">
-        <div className="w-11 h-11 flex items-center justify-center rounded-2xl bg-text-primary text-primary shadow-[0_18px_50px_rgba(255,255,255,0.12)] motion-card hover:scale-[1.04]">
-          <FolderKanban size={19} strokeWidth={2.5} className="text-primary" />
-        </div>
-      </div>
-
-      <nav className="relative flex flex-col gap-3 items-center">
-        <span
-          aria-hidden="true"
-          className={cn(
-            'sidebar-active-indicator',
-            isNavigating && 'sidebar-active-indicator-stretch sidebar-active-indicator-bounce'
-          )}
-          style={{
-            opacity: activeIndex >= 0 ? 1 : 0,
-            '--indicator-y': `${indicatorIndex * 60}px`,
-            transform: isNavigating ? undefined : `translateY(${indicatorIndex * 60}px)`,
-          } as React.CSSProperties}
-        />
-        {navItems.map((item) => {
-          const Icon = item.icon
-          return (
-            <NavLink
-              key={item.path}
-              to={item.path}
-              onClick={() => {
-                setClickActivePath(item.path)
-                setTimeout(() => setClickActivePath(null), 450)
-              }}
-              className={({ isActive }) => {
-                const isCurrent = isActive || item.match(location.pathname)
-                return cn(
-                  'sidebar-nav-item relative z-10 w-12 h-12 flex items-center justify-center rounded-2xl group',
-                  isCurrent
-                    ? 'bg-bg-tertiary text-text-primary shadow-[0_14px_38px_rgba(0,0,0,0.18)] scale-[1.03]'
-                    : 'text-text-secondary hover:bg-bg-secondary hover:text-text-primary hover:scale-[1.03]',
-                  clickActivePath === item.path && 'sidebar-nav-item-active-click'
-                )
-              }}
-              title={item.label}
-            >
-              <Icon size={19} className="opacity-85 group-hover:opacity-100 transition-opacity" />
-            </NavLink>
-          )
-        })}
+    <aside className="w-[84px] h-full bg-sidebar/90 flex flex-col py-5 px-3 flex-shrink-0 border-r border-border-subtle">
+      <div className="w-10 h-10 mx-auto rounded-xl bg-text-primary text-primary grid place-items-center"><FolderKanban size={18} strokeWidth={2.4} /></div>
+      <nav aria-label="主导航" className="mt-8 flex flex-col gap-2">
+        {items.map(item => { const Icon = item.icon; const active = item.active(location.pathname); return <NavLink key={item.path} to={item.path} aria-label={item.label} title={item.label} className={cn('h-12 rounded-xl flex flex-col items-center justify-center gap-1 text-[10px] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent-blue', active ? 'bg-bg-tertiary text-text-primary' : 'text-text-tertiary hover:text-text-primary hover:bg-bg-secondary')}><Icon size={17} /><span>{item.label}</span></NavLink> })}
       </nav>
-      
-      <div className="mt-auto text-center opacity-55 text-[11px] text-text-tertiary font-mono">
-        v0.1
-      </div>
+      <div className="mt-auto text-center text-[10px] text-text-tertiary font-mono">v{appVersion}</div>
     </aside>
   )
 }
-

@@ -23,6 +23,9 @@ export default defineConfig({
         onstart(options) {
           options.reload()
         },
+      },
+      {
+        entry: 'electron/launchWatchdog.ts',
       }
     ]),
     renderer(),

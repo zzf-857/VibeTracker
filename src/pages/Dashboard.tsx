@@ -1,397 +1,109 @@
-import { type CSSProperties, useEffect, useMemo, useRef, useState } from 'react'
-import { Activity, Clock3, FolderOpen, Plus, Sparkles } from 'lucide-react'
-import { Project, ProjectCommit } from '../types'
+import { useCallback, useEffect, useState } from 'react'
+import { AlertTriangle, ArrowRight, CheckSquare, Clock3, GitCommit, Loader2, PlayCircle, RefreshCcw, Sparkles } from 'lucide-react'
 import { useNavigate } from 'react-router-dom'
 import { AnimatedPage } from '../components/AnimatedPage'
-import { SafeImage } from '../components/SafeImage'
-import { formatDateKey, formatDateTime, getActivityLevel, getProjectCover, getRecentCommit, groupCommitsByDay } from '../lib/projectView'
-import { MOCK_MODE_LABEL, mockCommits, mockProjects, mockStatuses } from '../lib/mockData'
+import { LaunchButton } from '../components/LaunchButton'
 import { Skeleton } from '../components/Skeleton'
+import type { DashboardSummary, Project } from '../types'
+import { formatDateTime } from '../lib/projectView'
+import { useNotifications } from '../lib/notifications'
 import { useStore } from '../lib/store'
-import { InteractiveCard } from '../components/InteractiveCard'
-import { useTooltip } from '../components/CustomTooltip'
-
-
-
-function DashboardSkeleton() {
-  return (
-    <div className="flex flex-col min-h-full w-full py-8 px-10 gap-8">
-      {/* 头部标题区 */}
-      <div className="flex items-end justify-between">
-        <div className="space-y-2 w-1/3">
-          <Skeleton className="h-4 w-24 rounded" />
-          <Skeleton className="h-10 w-48 rounded-lg" />
-          <Skeleton className="h-4 w-72 rounded mt-2" />
-        </div>
-        <Skeleton className="h-11 w-32 rounded-full" />
-      </div>
-
-      {/* 4个 StatCard */}
-      <div className="grid grid-cols-4 gap-5">
-        {[1, 2, 3, 4].map(i => (
-          <div key={i} className="glass-panel rounded-[24px] p-6 space-y-3">
-            <div className="flex items-center justify-between">
-              <Skeleton className="w-8 h-8 rounded-xl" />
-            </div>
-            <Skeleton className="h-4 w-16 rounded" />
-            <Skeleton className="h-8 w-20 rounded-md" />
-          </div>
-        ))}
-      </div>
-
-      {/* 左右分栏 */}
-      <div className="grid grid-cols-[1.25fr_0.75fr] gap-6 flex-1 min-h-[420px]">
-        {/* 左栏最近活跃项目 */}
-        <div className="glass-panel rounded-[30px] p-6">
-          <div className="flex justify-between items-center mb-6">
-            <div className="space-y-2 w-1/4">
-              <Skeleton className="h-5 w-32 rounded" />
-              <Skeleton className="h-4.5 w-24 rounded" />
-            </div>
-            <Skeleton className="h-4 w-16 rounded" />
-          </div>
-          <div className="grid grid-cols-2 gap-4">
-            {[1, 2, 3, 4].map(i => (
-              <div key={i} className="bg-bg-secondary border border-border-subtle rounded-[24px] overflow-hidden h-[210px] space-y-4">
-                <Skeleton className="h-24 w-full rounded-none" />
-                <div className="p-4 space-y-3">
-                  <div className="flex justify-between items-center">
-                    <Skeleton className="h-5 w-24 rounded" />
-                    <Skeleton className="h-5 w-12 rounded-full" />
-                  </div>
-                  <Skeleton className="h-4 w-full rounded" />
-                </div>
-              </div>
-            ))}
-          </div>
-        </div>
-
-        {/* 右栏 */}
-        <div className="space-y-6">
-          {/* 近期提交流 */}
-          <div className="glass-panel rounded-[30px] p-6 space-y-4">
-            <Skeleton className="h-5 w-24 rounded" />
-            <div className="space-y-4">
-              {[1, 2, 3].map(i => (
-                <div key={i} className="border-l border-white/[0.06] pl-4 space-y-2">
-                  <Skeleton className="h-4 w-full rounded" />
-                  <Skeleton className="h-3.5 w-32 rounded" />
-                </div>
-              ))}
-            </div>
-          </div>
-          {/* 状态分布 */}
-          <div className="glass-panel rounded-[30px] p-6 space-y-4">
-            <Skeleton className="h-5 w-20 rounded" />
-            <div className="space-y-3">
-              {[1, 2, 3].map(i => (
-                <div key={i} className="flex justify-between items-center">
-                  <div className="flex items-center gap-2">
-                    <Skeleton className="w-2.5 h-2.5 rounded-full" />
-                    <Skeleton className="h-4 w-16 rounded" />
-                  </div>
-                  <Skeleton className="h-4 w-6 rounded" />
-                </div>
-              ))}
-            </div>
-          </div>
-        </div>
-      </div>
-    </div>
-  )
-}
 
 export function Dashboard() {
-  const { projects, statuses, isLoaded, refresh } = useStore()
-  const [allCommits, setAllCommits] = useState<ProjectCommit[]>([])
+  const [summary, setSummary] = useState<DashboardSummary | null>(null)
+  const [loadError, setLoadError] = useState('')
+  const [syncingProjectId, setSyncingProjectId] = useState<string | null>(null)
   const navigate = useNavigate()
+  const { notify } = useNotifications()
+  const { projects, refresh } = useStore()
 
+  const load = useCallback(() => {
+    setLoadError('')
+    return window.vibe.dashboard.get().then(setSummary).catch(error => {
+      const message = error instanceof Error ? error.message : String(error)
+      setLoadError(message)
+      notify({ tone: 'error', title: '首页加载失败', detail: message })
+    })
+  }, [notify])
+  useEffect(() => { void load() }, [load, projects])
   useEffect(() => {
-    if (!isLoaded) {
-      refresh()
+    const states = new Map<string, string>()
+    return window.vibe.launch.onState(state => {
+      if (states.get(state.profileId) === state.state) return
+      states.set(state.profileId, state.state)
+      void load()
+    })
+  }, [load])
+
+  const retrySync = async (projectId: string) => {
+    setSyncingProjectId(projectId)
+    try {
+      const result = await window.vibe.git.sync(projectId)
+      await refresh()
+      await load()
+      notify({ tone: 'success', title: result.inserted ? `发现 ${result.inserted} 个新提交` : 'Git 已是最新状态' })
+    } catch (error) {
+      notify({ tone: 'error', title: 'Git 同步失败', detail: error instanceof Error ? error.message : String(error) })
+    } finally {
+      setSyncingProjectId(null)
     }
-  }, [isLoaded, refresh])
-
-  useEffect(() => {
-    if (projects.length > 0) {
-      Promise.all(projects.map((project: Project) => window.ipcRenderer.invoke('get-commits', project.id)))
-        .then(commits => {
-          setAllCommits(commits.flat())
-        })
-        .catch(err => {
-          console.error('Failed to load commits for dashboard:', err)
-        })
-    }
-  }, [projects])
-
-  const isLoading = !isLoaded
-  const isMockMode = !isLoading && projects.length === 0
-  const displayProjects = isMockMode ? mockProjects : projects
-  const displayStatuses = isMockMode ? mockStatuses : statuses
-  const displayCommits = isMockMode ? mockCommits : allCommits
-
-  const commits = useMemo(() => {
-    return displayProjects
-      .map(project => ({ project, commit: getRecentCommit(project) }))
-      .filter(item => item.commit)
-      .sort((a, b) => (b.commit?.createdAt || 0) - (a.commit?.createdAt || 0))
-      .slice(0, 8) as { project: Project; commit: ProjectCommit }[]
-  }, [displayProjects])
-
-  const totalCommits = displayCommits.length || displayProjects.reduce((sum, project) => sum + (project.commitCount || 0), 0)
-  const recentSevenDayCount = displayCommits.filter(commit => Date.now() - commit.createdAt <= 7 * 24 * 60 * 60 * 1000).length
-
-  if (isLoading) {
-    return <DashboardSkeleton />
   }
 
+  if (!summary && loadError) return <div className="min-h-full grid place-items-center p-8"><div className="max-w-md text-center"><AlertTriangle size={34} className="mx-auto text-accent-red" /><h1 className="text-xl font-semibold mt-4">首页加载失败</h1><p className="text-sm text-text-tertiary mt-2 break-words">{loadError}</p><button onClick={() => void load()} className="mt-5 h-10 px-4 rounded-lg border border-border-primary text-sm inline-flex items-center gap-2"><RefreshCcw size={14} />重试加载</button></div></div>
+  if (!summary) return <DashboardSkeleton />
+
+  const actions = [
+    { label: '待处理 Git', value: summary.counts.pendingGit, icon: GitCommit, tone: 'text-accent-blue' },
+    { label: '待审核草稿', value: summary.counts.pendingDrafts, icon: Sparkles, tone: 'text-accent-blue' },
+    { label: '未完成待办', value: summary.counts.openTodos, icon: CheckSquare, tone: 'text-accent-orange' },
+    { label: '可启动项目', value: summary.counts.launchable, icon: PlayCircle, tone: 'text-status-completed' },
+    { label: '同步/启动异常', value: summary.failures.length + summary.launchFailures.length, icon: AlertTriangle, tone: summary.failures.length + summary.launchFailures.length ? 'text-accent-red' : 'text-text-tertiary' },
+  ]
+
   return (
-    <AnimatedPage tone="standard" className="flex flex-col min-h-full w-full py-8 px-10 gap-8">
-      <div className="stagger-item flex items-end justify-between" style={{ '--stagger': 0 } as CSSProperties}>
-        <div>
-          <p className="text-text-tertiary text-sm mb-2">Vibe Progress Center</p>
-          <div className="flex items-center gap-3">
-            <h1 className="text-[36px] font-semibold tracking-normal">项目进展总览</h1>
-            {isMockMode && <span className="px-3 py-1 rounded-full bg-white/[0.08] border border-border-subtle text-xs text-text-secondary">{MOCK_MODE_LABEL}</span>}
-          </div>
-          <p className="text-text-secondary text-sm mt-2">用最近提交和活跃度观察每个 vibecoding 项目的生长节奏。</p>
-        </div>
-        <button onClick={() => navigate('/projects')} className="bg-text-primary text-primary rounded-full px-5 py-3 text-sm font-semibold flex items-center gap-2 transition-all duration-[180ms] hover:opacity-90">
-          <Plus size={16} />
-          创建或查看项目
-        </button>
+    <AnimatedPage tone="standard" className="w-full min-h-full px-6 py-7 lg:px-8 xl:px-10">
+      <header><h1 className="text-3xl font-semibold">今天从哪里继续？</h1><p className="text-sm text-text-secondary mt-2">聚焦需要处理的同步、草稿、启动与待办。</p></header>
+
+      <div className="grid grid-cols-2 xl:grid-cols-5 gap-3 mt-7">
+        {actions.map(item => <div key={item.label} className="rounded-xl border border-border-subtle bg-bg-secondary/60 p-4"><item.icon size={17} className={item.tone} /><p className="text-2xl font-semibold mt-4">{item.value}</p><p className="text-xs text-text-tertiary mt-1">{item.label}</p></div>)}
       </div>
 
-      <div className="grid grid-cols-4 gap-5">
-        <StatCard index={1} icon={<FolderOpen size={18} />} label="项目总数" value={displayProjects.length.toString()} />
-        <StatCard index={2} icon={<Sparkles size={18} />} label="进展提交" value={totalCommits.toString()} />
-        <StatCard index={3} icon={<Activity size={18} />} label="近 7 日提交" value={recentSevenDayCount.toString()} />
-        <StatCard index={4} icon={<Clock3 size={18} />} label="自定义状态" value={displayStatuses.length.toString()} />
+      <div className="grid xl:grid-cols-[1.2fr_0.8fr] gap-4 mt-5">
+        <Section title="待处理 Git 提交" icon={<GitCommit size={16} />} empty="当前没有需要归档或忽略的 Git 提交。">
+          {summary.recentGit.map(commit => <button key={`${commit.projectId}:${commit.sha}`} onClick={() => navigate(`/project/${commit.projectId}?tab=records&view=git&sha=${commit.sha}`)} className="w-full py-3 flex items-center gap-3 text-left border-b border-border-subtle last:border-0 hover:bg-bg-tertiary/40 px-2 rounded-lg">{!commit.seenAt && <span className="w-1.5 h-1.5 rounded-full bg-accent-blue flex-shrink-0" aria-label="未读" />}<code className="text-xs text-accent-blue">{commit.sha.slice(0, 7)}</code><span className="min-w-0 flex-1"><strong className="block text-sm font-medium truncate">{commit.subject}</strong><span className="block text-[11px] text-text-tertiary mt-1">{commit.projectName} · {formatDateTime(commit.authoredAt)}</span></span><ArrowRight size={14} className="text-text-tertiary" /></button>)}
+        </Section>
+
+        <Section title="待审核 AI 草稿" icon={<Sparkles size={16} />} empty="当前没有待审核草稿。">
+          {summary.pendingReview.map(project => <ProjectAction key={project.id} project={project} detail={`${project.draftCount} 条草稿等待审核`} onClick={() => navigate(`/project/${project.id}?tab=records`)} />)}
+        </Section>
+
+        <Section title="最近活跃" icon={<Clock3 size={16} />} empty="导入项目后，这里会显示最近活动。">
+          {summary.recentProjects.map(project => <ProjectAction key={project.id} project={project} detail={project.recentRecord?.title || '尚无开发记录'} onClick={() => navigate(`/project/${project.id}`)} />)}
+        </Section>
+
+        <Section title="未完成待办" icon={<CheckSquare size={16} />} empty="当前没有未完成待办。">
+          {summary.openTodos.map(todo => <button key={todo.id} onClick={() => navigate(`/project/${todo.projectId}?tab=notes`)} className="w-full py-3 px-2 flex items-center gap-3 text-left border-b border-border-subtle last:border-0 hover:bg-bg-tertiary/40 rounded-lg"><span className="w-4 h-4 rounded border border-border-primary" /><span className="min-w-0 flex-1"><strong className="block text-sm font-medium truncate">{todo.content}</strong><span className="block text-[11px] text-text-tertiary mt-1">{todo.projectName}</span></span><ArrowRight size={14} className="text-text-tertiary" /></button>)}
+        </Section>
+
+        <Section title="可启动项目" icon={<PlayCircle size={16} />} empty="在项目设置中确认启动配置后，可从这里直接启动。">
+          {summary.launchableProjects.map(project => <div key={project.id} className="py-2.5 px-2 flex items-center justify-between gap-3 border-b border-border-subtle last:border-0"><button onClick={() => navigate(`/project/${project.id}`)} className="min-w-0 text-left"><strong className="text-sm font-medium truncate block">{project.name}</strong><span className="text-[11px] text-text-tertiary">独立于项目阶段，可随时启动</span></button><LaunchButton compact capability={project.launchCapability} onConfigure={() => navigate(`/project/${project.id}?tab=settings`)} /></div>)}
+        </Section>
       </div>
 
-      <div className="grid grid-cols-[1.25fr_0.75fr] gap-6 flex-1 min-h-[420px]">
-        <section className="glass-panel ambient-panel stagger-item rounded-[30px] p-6 overflow-hidden" style={{ '--stagger': 5 } as CSSProperties}>
-          <div className="flex items-center justify-between mb-6">
-            <div>
-              <h2 className="text-lg font-semibold">最近活跃项目</h2>
-              <p className="text-text-tertiary text-sm mt-1">按最近更新时间排列</p>
-            </div>
-            <button onClick={() => navigate('/projects')} className="text-sm text-text-secondary hover:text-text-primary transition-colors">查看画廊</button>
-          </div>
-          <div className="grid grid-cols-2 gap-4">
-            {displayProjects.slice(0, 6).map(project => (
-              <InteractiveCard key={project.id} onClick={() => navigate(`/project/${project.id}`)} className="dashboard-project-card motion-card group text-left bg-bg-secondary border border-border-subtle rounded-[24px] overflow-hidden min-h-[210px] cursor-pointer">
-                <div className="h-24 bg-bg-tertiary overflow-hidden">
-                  {getProjectCover(project) ? (
-                    <SafeImage src={getProjectCover(project)} alt={`${project.name} 封面`} className="w-full h-full object-cover gallery-cover" />
-                  ) : (
-                    <div className="h-full flex items-end p-4 text-text-tertiary text-sm">文字项目卡片</div>
-                  )}
-                </div>
-                <div className="p-4">
-                  <div className="flex items-center justify-between gap-3">
-                    <h3 className="font-semibold truncate">{project.name}</h3>
-                    {project.statusInfo && (
-                      <span className="px-2.5 py-1 rounded-full text-[11px] border border-border-subtle" style={{ color: project.statusInfo.color, backgroundColor: `${project.statusInfo.color}18` }}>{project.statusInfo.name}</span>
-                    )}
-                  </div>
-                  <p className="text-xs text-text-secondary mt-3 truncate">{getRecentCommit(project)?.title || project.description || '等待第一次提交'}</p>
-                </div>
-              </InteractiveCard>
-            ))}
-          </div>
-          {displayProjects.length === 0 && (
-            <EmptyState text="还没有项目。去项目画廊创建第一个 vibecoding 项目。" />
-          )}
-        </section>
-
-        <aside className="stagger-item flex flex-col gap-6" style={{ '--stagger': 6 } as CSSProperties}>
-          <section className="glass-panel rounded-[30px] p-6 motion-card">
-            <h2 className="text-lg font-semibold mb-4">近期提交流</h2>
-            <div className="space-y-4">
-              {commits.map(({ project, commit }, index) => (
-                <button key={commit.id} onClick={() => navigate(`/project/${project.id}`)} className="recent-stream-item block w-full text-left border-l border-border-primary pl-4 transition-all duration-[180ms] hover:border-accent-blue hover:translate-x-0.5" style={{ '--stagger': index, animationDelay: `${520 + index * 42}ms` } as CSSProperties}>
-                  <p className="font-medium text-sm truncate">{commit.title}</p>
-                  <p className="text-xs text-text-tertiary mt-1 font-mono">{formatDateTime(commit.createdAt)} · {project.name}</p>
-                </button>
-              ))}
-            </div>
-            {commits.length === 0 && <EmptyState text="还没有提交。每次 vibecoding 后写一条进展即可。" compact />}
-          </section>
-
-          <section className="glass-panel rounded-[30px] p-6 motion-card">
-            <h2 className="text-lg font-semibold mb-4">状态分布</h2>
-            <div className="space-y-3">
-              {displayStatuses.map(status => {
-                const count = displayProjects.filter(project => project.status === status.id).length
-                return (
-                  <div key={status.id} className="flex items-center justify-between text-sm">
-                    <div className="flex items-center gap-2">
-                      <span className="w-2.5 h-2.5 rounded-full breathing-dot" style={{ backgroundColor: status.color }} />
-                      <span className="text-text-secondary">{status.name}</span>
-                    </div>
-                    <span className="font-mono text-text-primary">{count}</span>
-                  </div>
-                )
-              })}
-            </div>
-          </section>
-
-          <section className="glass-panel rounded-[30px] p-6 motion-card">
-            <h2 className="text-lg font-semibold mb-4">整体活跃热力</h2>
-            <MiniHeatmap commits={displayCommits} />
-          </section>
-        </aside>
-      </div>
+      {(summary.failures.length > 0 || summary.launchFailures.length > 0) && <section className="mt-4 rounded-xl border border-accent-red/25 bg-accent-red/[0.06] p-4"><h2 className="text-sm font-semibold text-accent-red flex items-center gap-2"><AlertTriangle size={16} />需要处理</h2><div className="mt-2 grid md:grid-cols-2 gap-2">{summary.failures.map(project => <div key={project.id} className="rounded-lg bg-bg-primary/50 px-3 py-2 flex items-center gap-3"><button onClick={() => navigate(`/project/${project.id}`)} className="min-w-0 flex-1 text-left"><strong className="text-sm">{project.name}</strong><span className="block text-xs text-text-tertiary mt-1 truncate">{project.gitSync?.error || '同步失败'}</span></button><button onClick={() => void retrySync(project.id)} disabled={syncingProjectId === project.id} aria-label={`重试同步 ${project.name}`} className="h-8 px-2.5 rounded-lg border border-accent-red/25 text-xs text-accent-red flex items-center gap-1.5 disabled:opacity-50">{syncingProjectId === project.id ? <Loader2 size={12} className="animate-spin" /> : <RefreshCcw size={12} />}重试</button></div>)}{summary.launchFailures.map(failure => <button key={failure.profileId} onClick={() => navigate(`/project/${failure.projectId}?tab=settings&profile=${failure.profileId}`)} className="text-left rounded-lg bg-bg-primary/50 px-3 py-2"><strong className="text-sm">启动失败</strong><span className="block text-xs text-text-tertiary mt-1 truncate">{failure.error}</span></button>)}</div></section>}
     </AnimatedPage>
   )
 }
 
-function CountUpValue({ value }: { value: string }) {
-  const numeric = Number(value)
-  const [reducedMotion, setReducedMotion] = useState(() => window.matchMedia('(prefers-reduced-motion: reduce)').matches)
-  const [display, setDisplay] = useState(0)
-  const [shouldStart, setShouldStart] = useState(false)
-  const displayRef = useRef(0)
-  const frameRef = useRef<number | null>(null)
-
-  useEffect(() => {
-    const mediaQuery = window.matchMedia('(prefers-reduced-motion: reduce)')
-    const handleChange = (event: MediaQueryListEvent) => setReducedMotion(event.matches)
-
-    setReducedMotion(mediaQuery.matches)
-    mediaQuery.addEventListener('change', handleChange)
-
-    return () => mediaQuery.removeEventListener('change', handleChange)
-  }, [])
-
-  useEffect(() => {
-    if (reducedMotion) {
-      setShouldStart(true)
-      return
-    }
-
-    // Delay the start by 900ms to let page enter transitions and staggers complete beautifully
-    const timer = setTimeout(() => {
-      setShouldStart(true)
-    }, 900)
-    return () => clearTimeout(timer)
-  }, [reducedMotion])
-
-  useEffect(() => {
-    if (reducedMotion) {
-      displayRef.current = numeric
-      setDisplay(numeric)
-      return
-    }
-
-    if (!shouldStart || !Number.isFinite(numeric)) return
-
-    if (frameRef.current !== null) {
-      window.cancelAnimationFrame(frameRef.current)
-      frameRef.current = null
-    }
-
-    const start = displayRef.current
-    const delta = numeric - start
-    if (delta === 0) return
-
-    const startedAt = Date.now()
-    const duration = 420
-
-    const frame = () => {
-      const progress = Math.min(1, (Date.now() - startedAt) / duration)
-      const eased = progress < 0.5
-        ? 2 * progress * progress
-        : 1 - Math.pow(-2 * progress + 2, 2) / 2
-      const nextDisplay = Math.round(start + delta * eased)
-
-      displayRef.current = nextDisplay
-      setDisplay(nextDisplay)
-
-      if (progress < 1) {
-        frameRef.current = window.requestAnimationFrame(frame)
-      }
-    }
-
-    frameRef.current = window.requestAnimationFrame(frame)
-
-    return () => {
-      if (frameRef.current !== null) {
-        window.cancelAnimationFrame(frameRef.current)
-        frameRef.current = null
-      }
-    }
-  }, [numeric, shouldStart, reducedMotion])
-
-  return <>{Number.isFinite(numeric) ? display : value}</>
+function Section({ title, icon, empty, children }: { title: string; icon: React.ReactNode; empty: string; children: React.ReactNode }) {
+  const hasChildren = Array.isArray(children) ? children.length > 0 : Boolean(children)
+  return <section className="rounded-xl border border-border-subtle bg-bg-secondary/55 p-4 min-h-64"><h2 className="text-sm font-semibold flex items-center gap-2">{icon}{title}</h2><div className="mt-3">{hasChildren ? children : <p className="text-sm text-text-tertiary py-12 text-center">{empty}</p>}</div></section>
 }
 
-function StatCard({ icon, label, value, index }: { icon: React.ReactNode; label: string; value: string; index: number }) {
-  return (
-    <div className="glass-panel stagger-item rounded-[26px] p-5" style={{ '--stagger': index } as CSSProperties}>
-      <div className="flex items-center gap-2 text-text-secondary text-sm mb-4">
-        {icon}
-        {label}
-      </div>
-      <div className="text-[32px] font-semibold font-mono"><CountUpValue value={value} /></div>
-    </div>
-  )
+function ProjectAction({ project, detail, onClick }: { project: Project; detail: string; onClick: () => void }) {
+  return <button onClick={onClick} className="w-full py-3 px-2 flex items-center justify-between gap-3 text-left border-b border-border-subtle last:border-0 hover:bg-bg-tertiary/40 rounded-lg"><span className="min-w-0"><strong className="block text-sm font-medium truncate">{project.name}</strong><span className="block text-[11px] text-text-tertiary mt-1 truncate">{detail}</span></span><ArrowRight size={14} className="text-text-tertiary" /></button>
 }
 
-function EmptyState({ text, compact = false }: { text: string; compact?: boolean }) {
-  return (
-    <div className={`flex items-center justify-center text-center text-text-tertiary ${compact ? 'py-5 text-sm' : 'min-h-[220px]'}`}>
-      {text}
-    </div>
-  )
-}
-
-function MiniHeatmap({ commits }: { commits: ProjectCommit[] }) {
-  const counts = useMemo(() => groupCommitsByDay(commits), [commits])
-  const { showTooltip, hideTooltip } = useTooltip()
-
-  const days = useMemo(() => {
-    return Array.from({ length: 56 }).map((_, index) => {
-      const date = new Date()
-      date.setDate(date.getDate() - (55 - index))
-      const key = formatDateKey(date.getTime())
-      const count = counts.get(key) || 0
-      return { key, count, level: getActivityLevel(count) }
-    })
-  }, [counts])
-
-  if (commits.length === 0) {
-    return (
-      <div className="flex flex-col items-center justify-center py-6 text-center text-xs text-text-tertiary">
-        <span className="mb-2 opacity-60">📊 暂无活跃度数据</span>
-        <span>添加您的第一次提交后，此处将点亮您的活跃热力图。</span>
-      </div>
-    )
-  }
-
-  return (
-    <div className="grid gap-1.5 w-full items-start" style={{ gridTemplateColumns: 'repeat(14, minmax(0, 1fr))' }}>
-      {days.map(day => {
-        const className = ['bg-bg-tertiary', 'bg-status-level-1', 'bg-status-level-2', 'bg-status-level-3', 'bg-status-level-4'][day.level]
-        return (
-          <div
-            key={day.key}
-            onMouseMove={(e) => showTooltip(
-              <div className="flex flex-col gap-0.5">
-                <span className="font-semibold text-[10px] text-text-tertiary">{day.key}</span>
-                <span className="flex items-center gap-1.5 text-xs text-text-primary">
-                  <span className="w-1.5 h-1.5 rounded-full" style={{ backgroundColor: day.level > 0 ? '#63D693' : '#707A8A' }} />
-                  <strong>{day.count}</strong> 次进展提交
-                </span>
-              </div>,
-              e
-            )}
-            onMouseLeave={hideTooltip}
-            className={`w-full aspect-square h-auto rounded-[4px] transition-all duration-200 hover:scale-110 cursor-crosshair ${className}`}
-          />
-        )
-      })}
-    </div>
-  )
+function DashboardSkeleton() {
+  return <div className="p-6 lg:p-8 space-y-5"><div className="space-y-2"><Skeleton className="h-9 w-72 max-w-full rounded" /><Skeleton className="h-4 w-96 max-w-full rounded" /></div><div className="grid sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5 gap-3">{[1, 2, 3, 4, 5].map(item => <Skeleton key={item} className="h-32 rounded-xl" />)}</div><div className="grid lg:grid-cols-2 gap-4">{[1, 2, 3, 4].map(item => <Skeleton key={item} className="h-64 rounded-xl" />)}</div></div>
 }

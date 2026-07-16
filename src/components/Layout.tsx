@@ -47,33 +47,58 @@ export function Layout() {
   }, [renderedPages])
 
   useGSAP(() => {
+    const media = gsap.matchMedia()
+    let reduceMotion = false
+    media.add({ reduceMotion: '(prefers-reduced-motion: reduce)' }, context => {
+      reduceMotion = Boolean(context.conditions?.reduceMotion)
+    })
     // 1. Ensure the new page is actually mounted and in the 'enter' phase in the DOM
     const hasEnteringPage = renderedPages.some(p => p.key === location.pathname && p.phase === 'enter')
     if (!hasEnteringPage) return
 
     // 2. Animate Entering Page
     const enteringEl = containerRef.current?.querySelector('.page-route-enter')
+    const exitingEl = containerRef.current?.querySelector('.page-route-exit')
+    if (reduceMotion) {
+      if (enteringEl) gsap.set(enteringEl, { autoAlpha: 1, x: 0, y: 0, scale: 1, clearProps: 'filter' })
+      if (exitingEl) gsap.set(exitingEl, { autoAlpha: 0 })
+      return () => media.revert()
+    }
+    let revealTimer: number | null = null
+    const revealEnteringPage = () => {
+      if (!enteringEl) return
+      gsap.set(enteringEl, { autoAlpha: 1, x: 0, y: 0, scale: 1, clearProps: 'opacity,transform,filter,visibility' })
+    }
     if (enteringEl && lastAnimatedKeyRef.current !== location.pathname) {
       lastAnimatedKeyRef.current = location.pathname
       gsap.killTweensOf(enteringEl)
-      gsap.fromTo(enteringEl,
-        {
-          opacity: 0,
-          y: 22,
-          scale: 0.982,
-        },
-        {
-          opacity: 1,
-          y: 0,
-          scale: 1,
-          duration: 0.45,
-          ease: 'power3.out',
-        }
-      )
+      try {
+        gsap.fromTo(enteringEl,
+          {
+            opacity: 0,
+            y: 22,
+            scale: 0.982,
+          },
+          {
+            opacity: 1,
+            y: 0,
+            scale: 1,
+            duration: 0.45,
+            ease: 'power3.out',
+            onComplete: revealEnteringPage,
+            onInterrupt: revealEnteringPage,
+          }
+        )
+        // A suspended or interrupted animation must never leave the active
+        // route transparent after the static boot state has been removed.
+        revealTimer = window.setTimeout(revealEnteringPage, 750)
+      } catch (error) {
+        console.error('[RouteTransition] Unable to animate entering page:', error)
+        revealEnteringPage()
+      }
     }
 
     // 3. Animate Exiting Page
-    const exitingEl = containerRef.current?.querySelector('.page-route-exit')
     if (exitingEl) {
       gsap.killTweensOf(exitingEl)
       gsap.fromTo(exitingEl,
@@ -90,6 +115,11 @@ export function Layout() {
           ease: 'power2.out',
         }
       )
+    }
+    return () => {
+      if (revealTimer !== null) window.clearTimeout(revealTimer)
+      revealEnteringPage()
+      media.revert()
     }
   }, { dependencies: [renderedPages, location.pathname], scope: containerRef })
 

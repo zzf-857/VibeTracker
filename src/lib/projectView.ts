@@ -1,4 +1,4 @@
-import type { Project, ProjectCommit } from '../types.ts'
+import type { DevelopmentRecord, Project } from '../types.ts'
 
 export function getActivityLevel(count: number) {
   if (count <= 0) return 0
@@ -8,17 +8,20 @@ export function getActivityLevel(count: number) {
   return 4
 }
 
-export function getRecentCommit(project: Pick<Project, 'commits' | 'recentCommit'>) {
-  return project.recentCommit || project.commits?.[0] || null
+export function getRecentRecord(project: Pick<Project, 'records' | 'recentRecord' | 'commits' | 'recentCommit'>) {
+  return project.recentRecord || project.records?.[0] || project.recentCommit || project.commits?.[0] || null
 }
 
-export function getProjectCover(project: Pick<Project, 'coverImagePath' | 'commits' | 'recentCommit' | 'resolvedCoverImagePath'>) {
+/** @deprecated Use getRecentRecord. */
+export const getRecentCommit = getRecentRecord
+
+export function getProjectCover(project: Pick<Project, 'coverImagePath' | 'records' | 'recentRecord' | 'commits' | 'recentCommit' | 'resolvedCoverImagePath'>) {
   if (project.coverImagePath) return project.coverImagePath
   if (project.resolvedCoverImagePath) return project.resolvedCoverImagePath
-  const recentImage = getRecentCommit(project)?.images?.[0]?.imagePath
+  const recentImage = getRecentRecord(project)?.images?.[0]?.imagePath
   if (recentImage) return recentImage
-  for (const commit of project.commits || [] as ProjectCommit[]) {
-    const image = commit.images?.[0]?.imagePath
+  for (const record of project.records || project.commits || [] as DevelopmentRecord[]) {
+    const image = record.images?.[0]?.imagePath
     if (image) return image
   }
   return ''
@@ -41,17 +44,33 @@ export function formatDateKey(timestamp: number) {
   return `${year}-${month}-${day}`
 }
 
-export function toImageSrc(imagePath: string) {
+export type ImageThumbnailSize = 96 | 160 | 240 | 320 | 480 | 640 | 960 | 1280
+
+export function toImageSrc(imagePath: string, thumbnailSize?: ImageThumbnailSize) {
   if (!imagePath) return ''
-  if (/^(file|https?|data):/i.test(imagePath)) return imagePath
-  return `file:///${imagePath.replace(/\\/g, '/')}`
+  if (/^(https?|data):/i.test(imagePath)) return imagePath
+  if (/^vibe-asset:/i.test(imagePath)) {
+    try {
+      const url = new URL(imagePath)
+      if (thumbnailSize) url.searchParams.set('size', String(thumbnailSize))
+      else url.searchParams.delete('size')
+      return url.toString()
+    } catch {
+      return imagePath
+    }
+  }
+  const query = thumbnailSize ? `?size=${thumbnailSize}` : ''
+  return `vibe-asset://local/${encodeURIComponent(imagePath)}${query}`
 }
 
-export function groupCommitsByDay(commits: Pick<ProjectCommit, 'createdAt'>[]) {
+export function groupRecordsByDay(records: Pick<DevelopmentRecord, 'createdAt'>[]) {
   const counts = new Map<string, number>()
-  for (const commit of commits) {
-    const key = formatDateKey(commit.createdAt)
+  for (const record of records) {
+    const key = formatDateKey(record.createdAt)
     counts.set(key, (counts.get(key) || 0) + 1)
   }
   return counts
 }
+
+/** @deprecated Use groupRecordsByDay. */
+export const groupCommitsByDay = groupRecordsByDay

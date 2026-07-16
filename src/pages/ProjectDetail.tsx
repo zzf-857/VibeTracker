@@ -1,18 +1,50 @@
 import { type CSSProperties, useEffect, useMemo, useRef, useState } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
-import { CommitImage, Project, ProjectCommit, ProjectStatus, NoteBlock, Todo } from '../types'
-import { ArrowLeft, Camera, Check, CheckSquare, ChevronDown, ExternalLink, Folder, Github, ImagePlus, Maximize2, Pencil, Plus, RotateCcw, Save, Square, Star, StickyNote, Trash2, X } from 'lucide-react'
+import { CommitImage, Project, ProjectCommit, ProjectStatus, NoteBlock, Todo, Tag } from '../types'
+import { ArrowLeft, Calendar, Camera, Check, CheckSquare, ChevronDown, ExternalLink, Folder, Github, ImagePlus, Maximize2, Pencil, Plus, RotateCcw, Save, Square, Star, StickyNote, Trash2, X } from 'lucide-react'
 import { AnimatedPage } from '../components/AnimatedPage'
 import { SafeImage } from '../components/SafeImage'
 import { useImagePreview } from '../components/ImagePreview'
 import { formatDateKey, formatDateTime, getActivityLevel, getProjectCover, groupCommitsByDay } from '../lib/projectView'
-import { MOCK_MODE_LABEL, getMockProject, isMockProjectId, mockStatuses } from '../lib/mockData'
+import { MOCK_MODE_LABEL, getMockProject, isMockProjectId, mockStatuses, mockTags } from '../lib/mockData'
 import { Skeleton } from '../components/Skeleton'
 import { ConfirmDialog } from '../components/ConfirmDialog'
 import { useStore } from '../lib/store'
 import { useParticleEmitter } from '../components/ParticleEmitter'
 import { useTooltip } from '../components/CustomTooltip'
 import { cn } from '../lib/utils'
+
+const fileToBase64 = (file: File): Promise<string> => {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader()
+    reader.readAsDataURL(file)
+    reader.onload = () => resolve(reader.result as string)
+    reader.onerror = error => reject(error)
+  })
+}
+
+const processImageFile = async (file: File): Promise<string> => {
+  if ((file as any).path) {
+    return (file as any).path
+  }
+  const base64 = await fileToBase64(file)
+  const savedPath = await window.ipcRenderer.invoke('save-image-data', base64, file.name)
+  return savedPath
+}
+
+const formatDateDisplay = (date: Date): string => {
+  const now = new Date()
+  const diffDays = Math.round((new Date(now.getFullYear(), now.getMonth(), now.getDate()).getTime() - new Date(date.getFullYear(), date.getMonth(), date.getDate()).getTime()) / 86400000)
+
+  let datePart = ''
+  if (diffDays === 0) datePart = '今天'
+  else if (diffDays === 1) datePart = '昨天'
+  else if (diffDays === 2) datePart = '前天'
+  else datePart = `${date.getMonth() + 1}月${date.getDate()}日`
+
+  const timePart = `${String(date.getHours()).padStart(2, '0')}:${String(date.getMinutes()).padStart(2, '0')}`
+  return `${datePart} ${timePart}`
+}
 
 
 
@@ -21,7 +53,7 @@ function ProjectDetailSkeleton() {
     <div className="flex flex-col min-h-full w-full py-8 px-10 gap-7 animate-pulse">
       {/* 返回按钮 */}
       <Skeleton className="h-5 w-16 rounded" />
-      
+
       {/* 头部项目面板 */}
       <div className="glass-panel rounded-[32px] p-8 flex gap-8">
         {/* 左侧封面骨架 */}
@@ -95,18 +127,134 @@ export function ProjectDetail() {
   const [deletingTodoIds, setDeletingTodoIds] = useState<string[]>([])
   const [project, setProject] = useState<Project | null>(null)
   const [statuses, setStatuses] = useState<ProjectStatus[]>([])
+  const [allTags, setAllTags] = useState<Tag[]>([])
   const [isLoading, setIsLoading] = useState(true)
   const [commitTitle, setCommitTitle] = useState('')
   const [commitDescription, setCommitDescription] = useState('')
   const [progressDelta, setProgressDelta] = useState('')
-  const [commitImagePath, setCommitImagePath] = useState('')
+  const [commitImagePaths, setCommitImagePaths] = useState<string[]>([])
+  const [isDragOver, setIsDragOver] = useState(false)
+  const [isTimePickerOpen, setIsTimePickerOpen] = useState(false)
+  const [selectedDate, setSelectedDate] = useState<Date>(() => new Date())
+  const [isDateTimeModified, setIsDateTimeModified] = useState(false)
+
+  const activeTimeoutRef = useRef<any>(null)
+  const activeIntervalRef = useRef<any>(null)
+
+  const stopHold = () => {
+    if (activeTimeoutRef.current) clearTimeout(activeTimeoutRef.current)
+    if (activeIntervalRef.current) clearInterval(activeIntervalRef.current)
+    activeTimeoutRef.current = null
+    activeIntervalRef.current = null
+  }
+
+  const startHold = (action: () => void) => {
+    stopHold()
+    action()
+    activeTimeoutRef.current = setTimeout(() => {
+      activeIntervalRef.current = setInterval(() => {
+        action()
+      }, 70)
+    }, 350)
+  }
+
+  useEffect(() => {
+    return () => {
+      if (activeTimeoutRef.current) clearTimeout(activeTimeoutRef.current)
+      if (activeIntervalRef.current) clearInterval(activeIntervalRef.current)
+    }
+  }, [])
+
+  const adjustDate = (days: number) => {
+    setSelectedDate(current => {
+      const d = new Date(current)
+      d.setDate(d.getDate() + days)
+      return d
+    })
+    setIsDateTimeModified(true)
+  }
+
+  const adjustHours = (hours: number) => {
+    setSelectedDate(current => {
+      const d = new Date(current)
+      d.setHours(d.getHours() + hours)
+      return d
+    })
+    setIsDateTimeModified(true)
+  }
+
+  const adjustMinutes = (minutes: number) => {
+    setSelectedDate(current => {
+      const d = new Date(current)
+      d.setMinutes(d.getMinutes() + minutes)
+      return d
+    })
+    setIsDateTimeModified(true)
+  }
+
+  const handleKeyDown = (e: React.KeyboardEvent) => {
+    if (e.key === 'Enter' && (e.ctrlKey || e.metaKey)) {
+      e.preventDefault()
+      createCommit()
+    }
+  }
+
+  const handleImagesAdded = async (files: FileList | File[]) => {
+    const imageFiles = Array.from(files).filter(f => f.type.startsWith('image/'))
+    if (imageFiles.length === 0) return
+    try {
+      const paths = await Promise.all(imageFiles.map(processImageFile))
+      setCommitImagePaths(prev => [...prev, ...paths])
+    } catch (err) {
+      console.error('Failed to process uploaded images:', err)
+    }
+  }
+
+  const handleDragOver = (e: React.DragEvent) => {
+    e.preventDefault()
+    setIsDragOver(true)
+  }
+
+  const handleDragLeave = (e: React.DragEvent) => {
+    e.preventDefault()
+    setIsDragOver(false)
+  }
+
+  const handleDrop = async (e: React.DragEvent) => {
+    e.preventDefault()
+    setIsDragOver(false)
+    if (e.dataTransfer.files) {
+      await handleImagesAdded(e.dataTransfer.files)
+    }
+  }
+
+  const handlePaste = async (e: React.ClipboardEvent) => {
+    const items = Array.from(e.clipboardData.items)
+    const imageItems = items.filter(item => item.type.startsWith('image/'))
+    if (imageItems.length === 0) return
+    e.preventDefault()
+    const files: File[] = []
+    for (const item of imageItems) {
+      const file = item.getAsFile()
+      if (file) files.push(file)
+    }
+    if (files.length > 0) {
+      await handleImagesAdded(files)
+    }
+  }
   const [ritualCommitId, setRitualCommitId] = useState<string | null>(null)
   const [ritualStartedAt, setRitualStartedAt] = useState<number>(0)
   const [coverRitualKey, setCoverRitualKey] = useState('')
   const [isCreatingCommit, setIsCreatingCommit] = useState(false)
   const [editingCommit, setEditingCommit] = useState<ProjectCommit | null>(null)
   const [isEditingProject, setIsEditingProject] = useState(false)
-  const [projectDraft, setProjectDraft] = useState({ name: '', description: '', path: '', repoUrl: '' })
+  const [projectDraft, setProjectDraft] = useState<{
+    name: string
+    description: string
+    path: string
+    repoUrl: string
+    tagIds: string[]
+  }>({ name: '', description: '', path: '', repoUrl: '', tagIds: [] })
   const [pendingDeleteProject, setPendingDeleteProject] = useState(false)
   const [isStatusPickerOpen, setIsStatusPickerOpen] = useState(false)
   // NoteBlocks
@@ -144,6 +292,7 @@ export function ProjectDetail() {
       description: project.description || '',
       path: project.path || '',
       repoUrl: project.repoUrl || '',
+      tagIds: project.tags?.map(t => t.id) || [],
     })
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [project?.id])
@@ -151,14 +300,16 @@ export function ProjectDetail() {
   const loadData = async () => {
     if (!id) return
     try {
-      const [p, s] = await Promise.all([
+      const [p, s, t] = await Promise.all([
         window.ipcRenderer.invoke('get-project', id),
         window.ipcRenderer.invoke('get-statuses'),
+        window.ipcRenderer.invoke('get-tags'),
       ])
       if (!isMountedRef.current) return
       const mockProject = (!p || Array.isArray(p)) && isMockProjectId(id) ? getMockProject(id) : null
       setProject(mockProject || p)
       setStatuses(mockProject ? mockStatuses : s)
+      setAllTags(mockProject ? mockTags : t)
       refresh()
     } catch (err) {
       console.error('Failed to load project:', err)
@@ -202,13 +353,15 @@ export function ProjectDetail() {
     creatingCommitRef.current = true
     setIsCreatingCommit(true)
     try {
-      const imagePath = commitImagePath.trim()
+      const customTimestamp = isDateTimeModified ? selectedDate.getTime() : undefined
+
       const createdId = await window.ipcRenderer.invoke('create-commit', {
         projectId: project.id,
         title: commitTitle.trim(),
         description: commitDescription.trim(),
         progressDelta: Number(progressDelta) || 0,
-        imagePath,
+        imagePaths: commitImagePaths,
+        createdAt: customTimestamp,
       })
       if (!isMountedRef.current) return
       if (e) triggerConfetti(e.clientX, e.clientY)
@@ -216,11 +369,13 @@ export function ProjectDetail() {
       clearRitualTimeout()
       setRitualCommitId(createdId)
       setRitualStartedAt(now)
-      if (imagePath) triggerCoverRitual(createdId, now)
+      if (commitImagePaths.length > 0) triggerCoverRitual(createdId, now)
       setCommitTitle('')
       setCommitDescription('')
       setProgressDelta('')
-      setCommitImagePath('')
+      setCommitImagePaths([])
+      setIsDateTimeModified(false)
+      setSelectedDate(new Date())
       await loadData()
       if (!isMountedRef.current) return
       ritualTimeoutRef.current = window.setTimeout(() => {
@@ -235,8 +390,11 @@ export function ProjectDetail() {
   }
 
   const selectCommitImage = async () => {
-    const path = await window.ipcRenderer.invoke('select-image')
-    if (path && isMountedRef.current) setCommitImagePath(path)
+    const paths = await window.ipcRenderer.invoke('select-image', true)
+    if (paths && isMountedRef.current) {
+      const arrayPaths = Array.isArray(paths) ? paths : [paths]
+      setCommitImagePaths(prev => [...prev, ...arrayPaths])
+    }
   }
 
   const updateStatus = async (statusId: string) => {
@@ -253,6 +411,7 @@ export function ProjectDetail() {
       description: projectDraft.description.trim(),
       path: projectDraft.path.trim(),
       repoUrl: projectDraft.repoUrl.trim(),
+      tagIds: projectDraft.tagIds,
     })
     if (!isMountedRef.current) return
     setIsEditingProject(false)
@@ -453,6 +612,42 @@ export function ProjectDetail() {
                   className="w-full bg-bg-tertiary border border-border-subtle rounded-[22px] px-4 py-3 text-sm leading-6 outline-none focus:border-border-primary resize-none h-28"
                   placeholder="这个项目想解决什么？当前做到哪里了？"
                 />
+
+                {/* Categorization Tags Select */}
+                <div className="flex items-center gap-3 flex-wrap bg-bg-tertiary/40 border border-border-subtle rounded-[22px] px-4 py-3">
+                  <span className="text-xs text-text-tertiary">分类标签:</span>
+                  <div className="flex items-center gap-2 flex-wrap">
+                    {allTags.map(tag => {
+                      const isSelected = projectDraft.tagIds.includes(tag.id)
+                      return (
+                        <button
+                          key={tag.id}
+                          type="button"
+                          onClick={() => {
+                            setProjectDraft(prev => ({
+                              ...prev,
+                              tagIds: prev.tagIds.includes(tag.id)
+                                ? prev.tagIds.filter(id => id !== tag.id)
+                                : [...prev.tagIds, tag.id]
+                            }))
+                          }}
+                          className={`flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs transition-all duration-[180ms] ${
+                            isSelected
+                              ? 'bg-white/12 border border-white/20 text-text-primary'
+                              : 'bg-transparent border border-border-subtle text-text-tertiary hover:text-text-secondary hover:bg-white/[0.04]'
+                          }`}
+                        >
+                          <span className="w-1.5 h-1.5 rounded-full breathing-dot" style={{ backgroundColor: tag.color }} />
+                          {tag.name}
+                        </button>
+                      )
+                    })}
+                    {allTags.length === 0 && (
+                      <span className="text-xs text-text-tertiary italic">无可用标签，请先去“标签管理”页面创建</span>
+                    )}
+                  </div>
+                </div>
+
                 <div className="grid grid-cols-[1fr_1fr_auto] gap-3">
                   <input
                     value={projectDraft.path}
@@ -482,6 +677,12 @@ export function ProjectDetail() {
           <div className="flex items-center gap-3 flex-wrap mt-6">
             <span className="px-3 py-1.5 rounded-full bg-bg-tertiary border border-border-subtle text-sm text-text-secondary">{commits.length} 次提交</span>
             <span className="px-3 py-1.5 rounded-full bg-bg-tertiary border border-border-subtle text-sm text-text-secondary font-mono">updated {formatDateTime(project.updatedAt)}</span>
+            {project.tags && project.tags.map(tag => (
+              <span key={tag.id} className="px-3 py-1.5 rounded-full bg-bg-tertiary border border-border-subtle text-sm text-text-secondary flex items-center gap-2">
+                <span className="w-1.5 h-1.5 rounded-full breathing-dot" style={{ backgroundColor: tag.color }} />
+                {tag.name}
+              </span>
+            ))}
             {project.path && (
               <button onClick={openLocalPath} className="px-3 py-1.5 rounded-full bg-bg-tertiary border border-border-subtle text-sm text-text-tertiary hover:text-text-primary font-mono truncate max-w-[420px] flex items-center gap-2 transition-colors" title="打开本地项目文件夹">
                 <Folder size={13} /> {project.path}
@@ -541,17 +742,250 @@ export function ProjectDetail() {
             </div>
           </div>
 
-          <div className={`bg-bg-secondary border border-border-subtle rounded-[26px] p-4 mb-6 commit-composer ${ritualCommitId ? 'ritual-confirm' : ''}`}>
+          <div
+            onDragOver={handleDragOver}
+            onDragLeave={handleDragLeave}
+            onDrop={handleDrop}
+            onPaste={handlePaste}
+            className={`bg-bg-secondary border border-border-subtle rounded-[26px] p-4 mb-6 commit-composer relative ${ritualCommitId ? 'ritual-confirm' : ''}`}
+          >
+            {isDragOver && (
+              <div className="absolute inset-0 z-30 rounded-[26px] bg-[#111318]/85 backdrop-blur-md border border-dashed border-text-secondary flex flex-col items-center justify-center gap-3 animate-fade-in pointer-events-none">
+                <div className="w-14 h-14 rounded-full bg-white/10 flex items-center justify-center shadow-lg border border-white/20 animate-pulse">
+                  <ImagePlus size={24} className="text-text-primary" />
+                </div>
+                <p className="text-sm font-semibold text-text-primary tracking-wide">释放鼠标以添加截图</p>
+                <p className="text-xs text-text-tertiary">支持拖入多张图片</p>
+              </div>
+            )}
+
             <div className="grid grid-cols-[1fr_120px] gap-3 mb-3">
-              <input value={commitTitle} onChange={e => setCommitTitle(e.target.value)} className="motion-focus bg-bg-tertiary border border-border-subtle rounded-2xl px-4 py-2.5 text-sm outline-none focus:border-border-primary" placeholder="提交标题，例如：完成项目详情页定调" />
-              <input value={progressDelta} onChange={e => setProgressDelta(e.target.value)} className="motion-focus bg-bg-tertiary border border-border-subtle rounded-2xl px-4 py-2.5 text-sm outline-none focus:border-border-primary font-mono" placeholder="+0" />
+              <input value={commitTitle} onChange={e => setCommitTitle(e.target.value)} onKeyDown={handleKeyDown} className="motion-focus bg-bg-tertiary border border-border-subtle rounded-2xl px-4 py-2.5 text-sm outline-none focus:border-border-primary" placeholder="提交标题，例如：完成项目详情页定调" />
+              <input value={progressDelta} onChange={e => setProgressDelta(e.target.value)} onKeyDown={handleKeyDown} className="motion-focus bg-bg-tertiary border border-border-subtle rounded-2xl px-4 py-2.5 text-sm outline-none focus:border-border-primary font-mono" placeholder="+0" />
             </div>
-            <textarea value={commitDescription} onChange={e => setCommitDescription(e.target.value)} className="motion-focus w-full bg-bg-tertiary border border-border-subtle rounded-2xl px-4 py-3 text-sm outline-none focus:border-border-primary resize-none h-20" placeholder="描述这次推进了什么、为什么重要..." />
-            <div className="flex items-center gap-2 mt-3">
+            <textarea value={commitDescription} onChange={e => setCommitDescription(e.target.value)} onKeyDown={handleKeyDown} className="motion-focus w-full bg-bg-tertiary border border-border-subtle rounded-2xl px-4 py-3 text-sm outline-none focus:border-border-primary resize-none h-20" placeholder="描述这次推进了什么、为什么重要..." />
+
+            {commitImagePaths.length > 0 && (
+              <div className="grid grid-cols-4 gap-3 mt-3 p-3 bg-bg-tertiary/40 border border-border-subtle rounded-2xl">
+                {commitImagePaths.map((path, idx) => (
+                  <div key={`${path}-${idx}`} className="relative aspect-video rounded-xl overflow-hidden bg-bg-tertiary border border-border-subtle group/thumb animate-scale-up">
+                    <SafeImage src={path} alt="截图预览" className="w-full h-full object-cover" />
+                    <button
+                      type="button"
+                      onClick={() => setCommitImagePaths(prev => prev.filter((_, i) => i !== idx))}
+                      className="absolute top-1 right-1 w-6 h-6 rounded-full bg-black/60 hover:bg-black/85 text-white flex items-center justify-center backdrop-blur-md opacity-0 group-hover/thumb:opacity-100 transition-all duration-200 hover:scale-105 active:scale-95 z-10"
+                      title="移除截图"
+                    >
+                      <X size={12} />
+                    </button>
+                    <div className="absolute inset-x-0 bottom-0 px-2 py-1 bg-black/40 text-[9px] text-white/70 truncate backdrop-blur-sm pointer-events-none font-mono">
+                      {path.substring(Math.max(path.lastIndexOf('\\'), path.lastIndexOf('/')) + 1)}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+
+            <div className="flex items-center gap-2 mt-3 flex-wrap">
               <button onClick={selectCommitImage} className="motion-press commit-composer-button px-4 py-2 rounded-full bg-bg-tertiary border border-border-subtle text-sm text-text-secondary hover:text-text-primary flex items-center gap-2 transition-colors">
                 <ImagePlus size={15} /> 选择截图
               </button>
-              {commitImagePath && <span className="text-xs text-text-tertiary truncate flex-1 font-mono">{commitImagePath}</span>}
+              {commitImagePaths.length > 0 && (
+                <span className="text-xs text-text-tertiary truncate flex-1 font-mono">
+                  已添加 {commitImagePaths.length} 张截图
+                </span>
+              )}
+
+              {/* 极其精致的自定义时间输入药丸，采用 Popover 交互与微调器 */}
+              <div className="relative">
+                <button
+                  type="button"
+                  onClick={() => setIsTimePickerOpen(prev => !prev)}
+                  className={cn(
+                    "flex items-center gap-1 bg-bg-tertiary/50 border border-border-subtle rounded-full px-3 py-1.5 text-xs text-text-secondary hover:text-text-primary hover:bg-bg-tertiary/80 transition-all duration-200 cursor-pointer",
+                    isDateTimeModified ? "border-status-completed/60 text-status-completed bg-status-completed/5" : ""
+                  )}
+                  title="自定义提交时间"
+                >
+                  <Calendar size={13} className="mr-1 text-text-tertiary" />
+                  <span>{isDateTimeModified ? formatDateDisplay(selectedDate) : '当前时间'}</span>
+                  <ChevronDown size={12} className={cn("ml-1 transition-transform duration-200", isTimePickerOpen && "rotate-180")} />
+                </button>
+
+                {isTimePickerOpen && (
+                  <>
+                    <div
+                      className="fixed inset-0 z-40"
+                      onClick={() => setIsTimePickerOpen(false)}
+                    />
+                    <div className="absolute left-0 top-full mt-2 z-50 w-[290px] p-4 bg-[#14171b] border border-white/[0.08] shadow-[0_24px_70px_rgba(0,0,0,0.65)] rounded-[22px] flex flex-col gap-3 animate-scale-up">
+                      <div className="text-xs font-semibold text-text-secondary border-b border-border-subtle pb-2">自定义提交时间</div>
+
+                      {/* 快捷选项网格 */}
+                      <div className="grid grid-cols-2 gap-2 text-[11px]">
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setSelectedDate(new Date())
+                            setIsDateTimeModified(false)
+                          }}
+                          className="px-2 py-1.5 bg-bg-tertiary hover:bg-bg-secondary rounded-lg border border-border-subtle text-left transition-colors flex items-center gap-1"
+                        >
+                          <RotateCcw size={10} className="text-text-tertiary" />
+                          <span>当前时间</span>
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            const d = new Date()
+                            d.setDate(d.getDate() - 1)
+                            setSelectedDate(d)
+                            setIsDateTimeModified(true)
+                          }}
+                          className="px-2 py-1.5 bg-bg-tertiary hover:bg-bg-secondary rounded-lg border border-border-subtle text-left transition-colors"
+                        >
+                          昨天此时
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            const d = new Date()
+                            d.setDate(d.getDate() - 2)
+                            setSelectedDate(d)
+                            setIsDateTimeModified(true)
+                          }}
+                          className="px-2 py-1.5 bg-bg-tertiary hover:bg-bg-secondary rounded-lg border border-border-subtle text-left transition-colors"
+                        >
+                          前天此时
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            const d = new Date()
+                            d.setDate(d.getDate() - 7)
+                            setSelectedDate(d)
+                            setIsDateTimeModified(true)
+                          }}
+                          className="px-2 py-1.5 bg-bg-tertiary hover:bg-bg-secondary rounded-lg border border-border-subtle text-left transition-colors"
+                        >
+                          一周前此时
+                        </button>
+                      </div>
+
+                      {/* 微调控制区 */}
+                      <div className="flex flex-col gap-2 border-t border-border-subtle pt-2.5">
+                        {/* 年-月-日 微调 */}
+                        <div className="flex items-center justify-between text-xs">
+                          <span className="text-text-tertiary">日期</span>
+                          <div className="flex items-center gap-1.5">
+                            <button
+                              type="button"
+                              onMouseDown={() => startHold(() => adjustDate(-1))}
+                              onMouseUp={stopHold}
+                              onMouseLeave={stopHold}
+                              onTouchStart={(e) => { e.preventDefault(); startHold(() => adjustDate(-1)) }}
+                              onTouchEnd={stopHold}
+                              className="w-5.5 h-5.5 rounded bg-bg-tertiary border border-border-subtle hover:bg-bg-secondary flex items-center justify-center transition-colors text-[9px] select-none"
+                            >
+                              ◀
+                            </button>
+                            <span className="font-mono min-w-[76px] text-center text-[11px] text-text-primary">
+                              {selectedDate.getFullYear()}-{String(selectedDate.getMonth() + 1).padStart(2, '0')}-{String(selectedDate.getDate()).padStart(2, '0')}
+                            </span>
+                            <button
+                              type="button"
+                              onMouseDown={() => startHold(() => adjustDate(1))}
+                              onMouseUp={stopHold}
+                              onMouseLeave={stopHold}
+                              onTouchStart={(e) => { e.preventDefault(); startHold(() => adjustDate(1)) }}
+                              onTouchEnd={stopHold}
+                              className="w-5.5 h-5.5 rounded bg-bg-tertiary border border-border-subtle hover:bg-bg-secondary flex items-center justify-center transition-colors text-[9px] select-none"
+                            >
+                              ▶
+                            </button>
+                          </div>
+                        </div>
+
+                        {/* 小时 微调 */}
+                        <div className="flex items-center justify-between text-xs">
+                          <span className="text-text-tertiary">小时</span>
+                          <div className="flex items-center gap-1.5">
+                            <button
+                              type="button"
+                              onMouseDown={() => startHold(() => adjustHours(-1))}
+                              onMouseUp={stopHold}
+                              onMouseLeave={stopHold}
+                              onTouchStart={(e) => { e.preventDefault(); startHold(() => adjustHours(-1)) }}
+                              onTouchEnd={stopHold}
+                              className="w-5.5 h-5.5 rounded bg-bg-tertiary border border-border-subtle hover:bg-bg-secondary flex items-center justify-center transition-colors text-[9px] select-none"
+                            >
+                              ◀
+                            </button>
+                            <span className="font-mono min-w-[76px] text-center text-[11px] text-text-primary">
+                              {String(selectedDate.getHours()).padStart(2, '0')} 时
+                            </span>
+                            <button
+                              type="button"
+                              onMouseDown={() => startHold(() => adjustHours(1))}
+                              onMouseUp={stopHold}
+                              onMouseLeave={stopHold}
+                              onTouchStart={(e) => { e.preventDefault(); startHold(() => adjustHours(1)) }}
+                              onTouchEnd={stopHold}
+                              className="w-5.5 h-5.5 rounded bg-bg-tertiary border border-border-subtle hover:bg-bg-secondary flex items-center justify-center transition-colors text-[9px] select-none"
+                            >
+                              ▶
+                            </button>
+                          </div>
+                        </div>
+
+                        {/* 分钟 微调 */}
+                        <div className="flex items-center justify-between text-xs">
+                          <span className="text-text-tertiary">分钟</span>
+                          <div className="flex items-center gap-1.5">
+                            <button
+                              type="button"
+                              onMouseDown={() => startHold(() => adjustMinutes(-5))}
+                              onMouseUp={stopHold}
+                              onMouseLeave={stopHold}
+                              onTouchStart={(e) => { e.preventDefault(); startHold(() => adjustMinutes(-5)) }}
+                              onTouchEnd={stopHold}
+                              className="w-5.5 h-5.5 rounded bg-bg-tertiary border border-border-subtle hover:bg-bg-secondary flex items-center justify-center transition-colors text-[9px] select-none"
+                              title="减少 5 分钟"
+                            >
+                              ◀
+                            </button>
+                            <span className="font-mono min-w-[76px] text-center text-[11px] text-text-primary">
+                              {String(selectedDate.getMinutes()).padStart(2, '0')} 分
+                            </span>
+                            <button
+                              type="button"
+                              onMouseDown={() => startHold(() => adjustMinutes(5))}
+                              onMouseUp={stopHold}
+                              onMouseLeave={stopHold}
+                              onTouchStart={(e) => { e.preventDefault(); startHold(() => adjustMinutes(5)) }}
+                              onTouchEnd={stopHold}
+                              className="w-5.5 h-5.5 rounded bg-bg-tertiary border border-border-subtle hover:bg-bg-secondary flex items-center justify-center transition-colors text-[9px] select-none"
+                              title="增加 5 分钟"
+                            >
+                              ▶
+                            </button>
+                          </div>
+                        </div>
+                      </div>
+
+                      {/* 确认关闭按钮 */}
+                      <button
+                        type="button"
+                        onClick={() => setIsTimePickerOpen(false)}
+                        className="mt-1 w-full py-1.5 bg-text-primary text-primary hover:opacity-90 rounded-lg text-xs font-semibold transition-opacity"
+                      >
+                        确定
+                      </button>
+                    </div>
+                  </>
+                )}
+              </div>
+
               <button onClick={(e) => createCommit(e)} disabled={isMockProjectId(project.id) || isCreatingCommit || !commitTitle.trim()} className="motion-press ml-auto bg-text-primary text-primary rounded-full px-4 py-2 text-sm font-semibold flex items-center gap-2 transition-opacity hover:opacity-90 disabled:opacity-40">
                 <Plus size={15} /> {isMockProjectId(project.id) ? '展示中' : isCreatingCommit ? '提交中' : '提交'}
               </button>
@@ -761,7 +1195,7 @@ function CommitCard({ commit, onEdit, onDelete, onSetCover, isNew, index }: { co
 
   return (
     <article
-      className={`motion-card commit-card stagger-item-fast relative bg-bg-secondary border border-border-subtle rounded-[24px] p-5 transition-all duration-[220ms] hover:bg-bg-tertiary before:absolute before:-left-[31px] before:top-6 before:w-4 before:h-4 before:rounded-full before:bg-status-completed before:border-[4px] before:border-[#111318] ${isNew ? 'commit-card-new ritual-timeline' : ''}`}
+      className={`motion-card commit-card stagger-item-fast relative bg-bg-secondary border border-border-subtle rounded-[24px] p-5 transition-all duration-[220ms] hover:bg-bg-tertiary before:absolute before:-left-[28px] before:top-6 before:w-4 before:h-4 before:rounded-full before:bg-status-completed before:border-[4px] before:border-[#111318] ${isNew ? 'commit-card-new ritual-timeline' : ''}`}
       style={{ '--stagger': index + 1 } as CSSProperties}
     >
       <div className="flex items-start justify-between gap-4">
@@ -783,7 +1217,7 @@ function CommitCard({ commit, onEdit, onDelete, onSetCover, isNew, index }: { co
           {commit.images?.map(image => (
             <div key={image.id} className="relative aspect-video rounded-2xl overflow-hidden bg-bg-tertiary border border-border-subtle group/img">
               <SafeImage src={image.imagePath} alt={image.caption || commit.title} className="w-full h-full object-cover transition-transform duration-300 group-hover/img:scale-[1.03]" />
-              
+
               {/* 精美悬浮遮罩及工具栏 */}
               <div className="absolute inset-0 bg-black/45 opacity-0 group-hover/img:opacity-100 transition-opacity duration-200 flex items-center justify-center gap-3 z-10">
                 <button
@@ -833,6 +1267,60 @@ function CommitEditor({
   const [caption, setCaption] = useState('')
   const [pendingDeleteImageId, setPendingDeleteImageId] = useState<string | null>(null)
   const [isActive, setIsActive] = useState(false)
+  const [isDragOver, setIsDragOver] = useState(false)
+  const [isEditTimePickerOpen, setIsEditTimePickerOpen] = useState(false)
+  const [selectedEditDate, setSelectedEditDate] = useState<Date>(() => new Date(commit.createdAt))
+
+  const activeTimeoutRef = useRef<any>(null)
+  const activeIntervalRef = useRef<any>(null)
+
+  const stopHold = () => {
+    if (activeTimeoutRef.current) clearTimeout(activeTimeoutRef.current)
+    if (activeIntervalRef.current) clearInterval(activeIntervalRef.current)
+    activeTimeoutRef.current = null
+    activeIntervalRef.current = null
+  }
+
+  const startHold = (action: () => void) => {
+    stopHold()
+    action()
+    activeTimeoutRef.current = setTimeout(() => {
+      activeIntervalRef.current = setInterval(() => {
+        action()
+      }, 70)
+    }, 350)
+  }
+
+  useEffect(() => {
+    return () => {
+      if (activeTimeoutRef.current) clearTimeout(activeTimeoutRef.current)
+      if (activeIntervalRef.current) clearInterval(activeIntervalRef.current)
+    }
+  }, [])
+
+  const adjustEditDate = (days: number) => {
+    setSelectedEditDate(current => {
+      const d = new Date(current)
+      d.setDate(d.getDate() + days)
+      return d
+    })
+  }
+
+  const adjustEditHours = (hours: number) => {
+    setSelectedEditDate(current => {
+      const d = new Date(current)
+      d.setHours(d.getHours() + hours)
+      return d
+    })
+  }
+
+  const adjustEditMinutes = (minutes: number) => {
+    setSelectedEditDate(current => {
+      const d = new Date(current)
+      d.setMinutes(d.getMinutes() + minutes)
+      return d
+    })
+  }
 
   useEffect(() => {
     const timer = setTimeout(() => setIsActive(true), 25)
@@ -846,20 +1334,106 @@ function CommitEditor({
 
   const save = async () => {
     if (!title.trim()) return
+    const customTimestamp = selectedEditDate.getTime()
+
     await window.ipcRenderer.invoke('update-commit', commit.id, {
       title: title.trim(),
       description: description.trim(),
       progressDelta: Number(progressDelta) || 0,
+      createdAt: customTimestamp,
     })
     setIsActive(false)
     setTimeout(onSaved, 380)
   }
 
+  const handleEditorKeyDown = (e: React.KeyboardEvent) => {
+    if (e.key === 'Enter' && (e.ctrlKey || e.metaKey)) {
+      e.preventDefault()
+      save()
+    }
+  }
+
+  const handleEditorDragOver = (e: React.DragEvent) => {
+    e.preventDefault()
+    setIsDragOver(true)
+  }
+
+  const handleEditorDragLeave = (e: React.DragEvent) => {
+    e.preventDefault()
+    setIsDragOver(false)
+  }
+
+  const handleEditorImagesAdded = async (files: FileList | File[]) => {
+    const imageFiles = Array.from(files).filter(f => f.type.startsWith('image/'))
+    if (imageFiles.length === 0) return
+
+    try {
+      const paths = await Promise.all(imageFiles.map(processImageFile))
+      const newImages: CommitImage[] = []
+
+      for (let i = 0; i < paths.length; i++) {
+        const path = paths[i]
+        const id = await window.ipcRenderer.invoke('add-commit-image', commit.id, path, caption.trim())
+        newImages.push({
+          id,
+          commitId: commit.id,
+          imagePath: path,
+          caption: caption.trim(),
+          sortIndex: images.length + i,
+          createdAt: Date.now()
+        })
+      }
+
+      setImages(prev => [...prev, ...newImages])
+      setCaption('')
+      onChanged()
+    } catch (err) {
+      console.error('Failed to upload images in editor:', err)
+    }
+  }
+
+  const handleEditorDrop = async (e: React.DragEvent) => {
+    e.preventDefault()
+    setIsDragOver(false)
+    if (e.dataTransfer.files) {
+      await handleEditorImagesAdded(e.dataTransfer.files)
+    }
+  }
+
+  const handleEditorPaste = async (e: React.ClipboardEvent) => {
+    const items = Array.from(e.clipboardData.items)
+    const imageItems = items.filter(item => item.type.startsWith('image/'))
+    if (imageItems.length === 0) return
+
+    e.preventDefault()
+    const files: File[] = []
+    for (const item of imageItems) {
+      const file = item.getAsFile()
+      if (file) files.push(file)
+    }
+    if (files.length > 0) {
+      await handleEditorImagesAdded(files)
+    }
+  }
+
   const addImage = async () => {
-    const path = await window.ipcRenderer.invoke('select-image')
+    const path = await window.ipcRenderer.invoke('select-image', true)
     if (path) {
-      const id = await window.ipcRenderer.invoke('add-commit-image', commit.id, path, caption.trim())
-      setImages(prev => [...prev, { id, commitId: commit.id, imagePath: path, caption: caption.trim(), sortIndex: prev.length, createdAt: Date.now() }])
+      const arrayPaths = Array.isArray(path) ? path : [path]
+      const newImages: CommitImage[] = []
+      for (let i = 0; i < arrayPaths.length; i++) {
+        const p = arrayPaths[i]
+        const id = await window.ipcRenderer.invoke('add-commit-image', commit.id, p, caption.trim())
+        newImages.push({
+          id,
+          commitId: commit.id,
+          imagePath: p,
+          caption: caption.trim(),
+          sortIndex: images.length + i,
+          createdAt: Date.now()
+        })
+      }
+      setImages(prev => [...prev, ...newImages])
       setCaption('')
       onChanged()
     }
@@ -876,15 +1450,218 @@ function CommitEditor({
         if (e.target === e.currentTarget) handleClose()
       }}
     >
-      <aside className={cn("editor-panel w-[500px] h-full bg-[#111318] border-l border-border-primary p-6 shadow-2xl overflow-y-auto custom-scrollbar", isActive && "editor-panel-active")}>
+      <aside
+        onDragOver={handleEditorDragOver}
+        onDragLeave={handleEditorDragLeave}
+        onDrop={handleEditorDrop}
+        onPaste={handleEditorPaste}
+        className={cn("editor-panel w-[500px] h-full bg-[#111318] border-l border-border-primary p-6 shadow-2xl overflow-y-auto custom-scrollbar relative", isActive && "editor-panel-active")}
+      >
+        {isDragOver && (
+          <div className="absolute inset-0 z-30 bg-[#111318]/90 backdrop-blur-md border border-dashed border-text-secondary flex flex-col items-center justify-center gap-3 animate-fade-in pointer-events-none">
+            <div className="w-14 h-14 rounded-full bg-white/10 flex items-center justify-center shadow-lg border border-white/20 animate-pulse">
+              <ImagePlus size={24} className="text-text-primary" />
+            </div>
+            <p className="text-sm font-semibold text-text-primary tracking-wide">释放鼠标以添加截图</p>
+            <p className="text-xs text-text-tertiary">实时上传并保存至当前提交</p>
+          </div>
+        )}
+
         <div className="flex items-center justify-between mb-6">
           <h2 className="text-xl font-semibold">编辑提交</h2>
           <button onClick={handleClose} className="motion-action text-text-tertiary hover:text-text-primary"><X size={18} /></button>
         </div>
         <div className="space-y-4">
-          <input value={title} onChange={e => setTitle(e.target.value)} className="motion-focus w-full bg-bg-secondary border border-border-subtle rounded-2xl px-4 py-3 text-sm outline-none" />
-          <textarea value={description} onChange={e => setDescription(e.target.value)} className="motion-focus w-full bg-bg-secondary border border-border-subtle rounded-2xl px-4 py-3 text-sm outline-none h-40 resize-none" />
-          <input value={progressDelta} onChange={e => setProgressDelta(e.target.value)} className="motion-focus w-full bg-bg-secondary border border-border-subtle rounded-2xl px-4 py-3 text-sm outline-none font-mono" placeholder="进度变化" />
+          <input value={title} onChange={e => setTitle(e.target.value)} onKeyDown={handleEditorKeyDown} className="motion-focus w-full bg-bg-secondary border border-border-subtle rounded-2xl px-4 py-3 text-sm outline-none" />
+          <textarea value={description} onChange={e => setDescription(e.target.value)} onKeyDown={handleEditorKeyDown} className="motion-focus w-full bg-bg-secondary border border-border-subtle rounded-2xl px-4 py-3 text-sm outline-none h-40 resize-none" />
+          <input value={progressDelta} onChange={e => setProgressDelta(e.target.value)} onKeyDown={handleEditorKeyDown} className="motion-focus w-full bg-bg-secondary border border-border-subtle rounded-2xl px-4 py-3 text-sm outline-none font-mono" placeholder="进度变化" />
+
+          <div className="flex items-center justify-between bg-bg-secondary border border-border-subtle rounded-2xl px-4 py-3 text-sm text-text-secondary">
+            <div className="flex items-center gap-2">
+              <Calendar size={15} className="text-text-tertiary" />
+              <span className="text-xs text-text-tertiary">修改提交时间:</span>
+            </div>
+
+            <div className="relative">
+              <button
+                type="button"
+                onClick={() => setIsEditTimePickerOpen(prev => !prev)}
+                className="flex items-center gap-1 bg-bg-tertiary/50 border border-border-subtle rounded-full px-3 py-1.5 text-xs text-text-secondary hover:text-text-primary hover:bg-bg-tertiary/80 transition-all duration-200 cursor-pointer"
+                title="自定义提交时间"
+              >
+                <span>{formatDateDisplay(selectedEditDate)}</span>
+                <ChevronDown size={12} className={cn("ml-1 transition-transform duration-200", isEditTimePickerOpen && "rotate-180")} />
+              </button>
+
+              {isEditTimePickerOpen && (
+                <>
+                  <div
+                    className="fixed inset-0 z-40"
+                    onClick={() => setIsEditTimePickerOpen(false)}
+                  />
+                  <div className="absolute right-0 top-full mt-2 z-50 w-[290px] p-4 bg-[#14171b] border border-white/[0.08] shadow-[0_24px_70px_rgba(0,0,0,0.65)] rounded-[22px] flex flex-col gap-3 animate-scale-up">
+                    <div className="text-xs font-semibold text-text-secondary border-b border-border-subtle pb-2">自定义提交时间</div>
+
+                    {/* 快捷选项 */}
+                    <div className="grid grid-cols-2 gap-2 text-[11px]">
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setSelectedEditDate(new Date(commit.createdAt))
+                        }}
+                        className="px-2 py-1.5 bg-bg-tertiary hover:bg-bg-secondary rounded-lg border border-border-subtle text-left transition-colors flex items-center gap-1"
+                      >
+                        <RotateCcw size={10} className="text-text-tertiary" />
+                        <span>恢复原时间</span>
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setSelectedEditDate(new Date())
+                        }}
+                        className="px-2 py-1.5 bg-bg-tertiary hover:bg-bg-secondary rounded-lg border border-border-subtle text-left transition-colors"
+                      >
+                        设为当前时间
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          const d = new Date(selectedEditDate)
+                          d.setDate(d.getDate() - 1)
+                          setSelectedEditDate(d)
+                        }}
+                        className="px-2 py-1.5 bg-bg-tertiary hover:bg-bg-secondary rounded-lg border border-border-subtle text-left transition-colors"
+                      >
+                        前一天此时
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          const d = new Date(selectedEditDate)
+                          d.setDate(d.getDate() + 1)
+                          setSelectedEditDate(d)
+                        }}
+                        className="px-2 py-1.5 bg-bg-tertiary hover:bg-bg-secondary rounded-lg border border-border-subtle text-left transition-colors"
+                      >
+                        后一天此时
+                      </button>
+                    </div>
+
+                    {/* 微调控制区 */}
+                    <div className="flex flex-col gap-2 border-t border-border-subtle pt-2.5">
+                      {/* 年-月-日 微调 */}
+                      <div className="flex items-center justify-between text-xs">
+                        <span className="text-text-tertiary">日期</span>
+                        <div className="flex items-center gap-1.5">
+                          <button
+                            type="button"
+                            onMouseDown={() => startHold(() => adjustEditDate(-1))}
+                            onMouseUp={stopHold}
+                            onMouseLeave={stopHold}
+                            onTouchStart={(e) => { e.preventDefault(); startHold(() => adjustEditDate(-1)) }}
+                            onTouchEnd={stopHold}
+                            className="w-5.5 h-5.5 rounded bg-bg-tertiary border border-border-subtle hover:bg-bg-secondary flex items-center justify-center transition-colors text-[9px] select-none"
+                          >
+                            ◀
+                          </button>
+                          <span className="font-mono min-w-[76px] text-center text-[11px] text-text-primary">
+                            {selectedEditDate.getFullYear()}-{String(selectedEditDate.getMonth() + 1).padStart(2, '0')}-{String(selectedEditDate.getDate()).padStart(2, '0')}
+                          </span>
+                          <button
+                            type="button"
+                            onMouseDown={() => startHold(() => adjustEditDate(1))}
+                            onMouseUp={stopHold}
+                            onMouseLeave={stopHold}
+                            onTouchStart={(e) => { e.preventDefault(); startHold(() => adjustEditDate(1)) }}
+                            onTouchEnd={stopHold}
+                            className="w-5.5 h-5.5 rounded bg-bg-tertiary border border-border-subtle hover:bg-bg-secondary flex items-center justify-center transition-colors text-[9px] select-none"
+                          >
+                            ▶
+                          </button>
+                        </div>
+                      </div>
+
+                      {/* 小时 微调 */}
+                      <div className="flex items-center justify-between text-xs">
+                        <span className="text-text-tertiary">小时</span>
+                        <div className="flex items-center gap-1.5">
+                          <button
+                            type="button"
+                            onMouseDown={() => startHold(() => adjustEditHours(-1))}
+                            onMouseUp={stopHold}
+                            onMouseLeave={stopHold}
+                            onTouchStart={(e) => { e.preventDefault(); startHold(() => adjustEditHours(-1)) }}
+                            onTouchEnd={stopHold}
+                            className="w-5.5 h-5.5 rounded bg-bg-tertiary border border-border-subtle hover:bg-bg-secondary flex items-center justify-center transition-colors text-[9px] select-none"
+                          >
+                            ◀
+                          </button>
+                          <span className="font-mono min-w-[76px] text-center text-[11px] text-text-primary">
+                            {String(selectedEditDate.getHours()).padStart(2, '0')} 时
+                          </span>
+                          <button
+                            type="button"
+                            onMouseDown={() => startHold(() => adjustEditHours(1))}
+                            onMouseUp={stopHold}
+                            onMouseLeave={stopHold}
+                            onTouchStart={(e) => { e.preventDefault(); startHold(() => adjustEditHours(1)) }}
+                            onTouchEnd={stopHold}
+                            className="w-5.5 h-5.5 rounded bg-bg-tertiary border border-border-subtle hover:bg-bg-secondary flex items-center justify-center transition-colors text-[9px] select-none"
+                          >
+                            ▶
+                          </button>
+                        </div>
+                      </div>
+
+                      {/* 分钟 微调 */}
+                      <div className="flex items-center justify-between text-xs">
+                        <span className="text-text-tertiary">分钟</span>
+                        <div className="flex items-center gap-1.5">
+                          <button
+                            type="button"
+                            onMouseDown={() => startHold(() => adjustEditMinutes(-5))}
+                            onMouseUp={stopHold}
+                            onMouseLeave={stopHold}
+                            onTouchStart={(e) => { e.preventDefault(); startHold(() => adjustEditMinutes(-5)) }}
+                            onTouchEnd={stopHold}
+                            className="w-5.5 h-5.5 rounded bg-bg-tertiary border border-border-subtle hover:bg-bg-secondary flex items-center justify-center transition-colors text-[9px] select-none"
+                            title="减少 5 分钟"
+                          >
+                            ◀
+                          </button>
+                          <span className="font-mono min-w-[76px] text-center text-[11px] text-text-primary">
+                            {String(selectedEditDate.getMinutes()).padStart(2, '0')} 分
+                          </span>
+                          <button
+                            type="button"
+                            onMouseDown={() => startHold(() => adjustEditMinutes(5))}
+                            onMouseUp={stopHold}
+                            onMouseLeave={stopHold}
+                            onTouchStart={(e) => { e.preventDefault(); startHold(() => adjustEditMinutes(5)) }}
+                            onTouchEnd={stopHold}
+                            className="w-5.5 h-5.5 rounded bg-bg-tertiary border border-border-subtle hover:bg-bg-secondary flex items-center justify-center transition-colors text-[9px] select-none"
+                            title="增加 5 分钟"
+                          >
+                            ▶
+                          </button>
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* 确认关闭按钮 */}
+                    <button
+                      type="button"
+                      onClick={() => setIsEditTimePickerOpen(false)}
+                      className="mt-1 w-full py-1.5 bg-text-primary text-primary hover:opacity-90 rounded-lg text-xs font-semibold transition-opacity"
+                    >
+                      确定
+                    </button>
+                  </div>
+                </>
+              )}
+            </div>
+          </div>
+
           <div className="bg-bg-secondary border border-border-subtle rounded-[24px] p-4">
             <div className="flex items-center justify-between gap-3 mb-3">
               <div>
@@ -896,11 +1673,12 @@ function CommitEditor({
             <input
               value={caption}
               onChange={e => setCaption(e.target.value)}
+              onKeyDown={handleEditorKeyDown}
               className="motion-focus w-full bg-bg-tertiary border border-border-subtle rounded-full px-4 py-2.5 text-xs outline-none mb-3"
               placeholder="新截图说明，可选"
             />
             <button onClick={addImage} className="motion-action w-full bg-bg-tertiary border border-border-subtle rounded-full px-4 py-3 text-sm text-text-secondary hover:text-text-primary flex items-center justify-center gap-2">
-              <ImagePlus size={15} /> 添加截图路径
+              <ImagePlus size={15} /> 选择并添加截图
             </button>
             <div className="space-y-3 mt-4">
               {images.map(image => (

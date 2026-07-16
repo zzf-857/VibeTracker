@@ -1,23 +1,32 @@
 {
-  "name": "ai-tools-manager",
+  "name": "vibetracker",
   "version": "0.1.0",
   "description": "A PC desktop application for managing local project progress",
   "main": "dist-electron/main.js",
   "scripts": {
     "dev": "vite",
     "seed:demo": "python scripts/seed-demo-data.py",
-    "test:unit": "node --test tests/*.test.ts",
+    "test:unit": "node --import tsx --test tests/*.test.ts",
+    "test:e2e": "npm run build && playwright test",
+    "test:e2e:run": "playwright test",
+    "test:e2e:headed": "npm run build && playwright test --headed",
     "build": "tsc -p tsconfig.json && tsc -p tsconfig.node.json && vite build && npm run build:electron",
-    "build:electron": "tsc -p electron/tsconfig.json",
+    "build:electron": "node scripts/clean-electron-dist.mjs && tsc -p electron/tsconfig.json",
     "lint": "eslint . --ext ts,tsx --report-unused-disable-directives --max-warnings 0",
     "preview": "vite preview",
-    "electron:start": "npm run build:electron && electron ."
+    "electron:run": "electron .",
+    "electron:start": "npm run build && electron .",
+    "package": "npm run build && electron-builder --win",
+    "package:smoke": "npm run package -- --publish never && node scripts/smoke-packaged.mjs",
+    "package:installed-smoke": "npm run package -- --publish never && node scripts/smoke-installed.mjs",
+    "dist:win": "npm run package"
   },
   "dependencies": {
     "@gsap/react": "^2.1.2",
     "better-sqlite3": "^11.1.2",
     "clsx": "^2.1.1",
     "date-fns": "^4.1.0",
+    "electron-updater": "^6.8.9",
     "gsap": "^3.15.0",
     "lucide-react": "^0.344.0",
     "react": "^18.2.0",
@@ -27,6 +36,7 @@
   },
   "devDependencies": {
     "@electron/rebuild": "^4.0.3",
+    "@playwright/test": "^1.61.1",
     "@types/better-sqlite3": "^7.6.13",
     "@types/react": "^18.2.66",
     "@types/react-dom": "^18.2.22",
@@ -41,21 +51,50 @@
     "eslint-plugin-react-refresh": "^0.4.6",
     "postcss": "^8.5.6",
     "tailwindcss": "^3.4.19",
+    "tsx": "^4.22.4",
     "typescript": "^5.2.2",
     "vite": "^5.2.0",
     "vite-plugin-electron": "^0.28.6",
     "vite-plugin-electron-renderer": "^0.14.5"
   },
   "build": {
-    "appId": "com.aitoolsmanager.app",
-    "productName": "DevTracker",
+    "appId": "com.zzf857.vibetracker",
+    "productName": "VibeTracker",
     "directories": {
       "output": "release"
     },
+    "publish": [
+      {
+        "provider": "github",
+        "owner": "zzf-857",
+        "repo": "VibeTracker"
+      }
+    ],
+    "files": [
+      "dist/**/*",
+      "dist-electron/**/*",
+      "package.json"
+    ],
+    "asarUnpack": [
+      "**/node_modules/better-sqlite3/**/*"
+    ],
     "win": {
       "target": [
-        "nsis"
+        {
+          "target": "nsis",
+          "arch": [
+            "x64"
+          ]
+        }
       ]
+    },
+    "nsis": {
+      "artifactName": "VibeTracker-Setup-${version}.${ext}",
+      "oneClick": false,
+      "allowToChangeInstallationDirectory": true,
+      "createDesktopShortcut": true,
+      "createStartMenuShortcut": true,
+      "shortcutName": "VibeTracker"
     }
   }
 }

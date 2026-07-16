@@ -1,4 +1,4 @@
-import type { Project, ProjectCommit, ProjectStatus, Tag } from '../types'
+import type { DevelopmentRecord, Project, ProjectStatus, Tag } from '../types'
 
 const now = Date.now()
 const day = 24 * 60 * 60 * 1000
@@ -45,14 +45,13 @@ function mockImage(title: string, accent: string, secondary = '#151A21') {
   return `data:image/svg+xml;utf8,${encodeURIComponent(svg)}`
 }
 
-function commit(projectId: string, index: number, daysAgo: number, title: string, description: string, imagePath = ''): ProjectCommit {
+function commit(projectId: string, index: number, daysAgo: number, title: string, description: string, imagePath = ''): DevelopmentRecord {
   const createdAt = now - daysAgo * day - index * 90 * 60 * 1000
   return {
     id: `${projectId}-commit-${index}`,
     projectId,
     title,
     description,
-    progressDelta: index % 2 === 0 ? 6 : 0,
     createdAt,
     updatedAt: createdAt,
     images: imagePath ? [{
@@ -82,7 +81,6 @@ export const mockProjects: Project[] = [
     repoUrl: 'https://github.com/zzf-857/VibeTracker',
     status: 'mock-status-polish',
     statusInfo: mockStatuses[1],
-    progress: 0,
     coverImagePath: '',
     resolvedCoverImagePath: covers.center,
     createdAt: now - 34 * day,
@@ -103,7 +101,6 @@ export const mockProjects: Project[] = [
     repoUrl: 'https://github.com/zzf-857/PromptPocket',
     status: 'mock-status-prototype',
     statusInfo: mockStatuses[0],
-    progress: 0,
     coverImagePath: '',
     resolvedCoverImagePath: covers.prompt,
     createdAt: now - 20 * day,
@@ -123,7 +120,6 @@ export const mockProjects: Project[] = [
     repoUrl: 'https://github.com/zzf-857/ReleaseDesk',
     status: 'mock-status-demo',
     statusInfo: mockStatuses[2],
-    progress: 0,
     coverImagePath: '',
     resolvedCoverImagePath: covers.launch,
     createdAt: now - 16 * day,
@@ -143,7 +139,6 @@ export const mockProjects: Project[] = [
     repoUrl: 'https://github.com/zzf-857/MotionLab',
     status: 'mock-status-polish',
     statusInfo: mockStatuses[1],
-    progress: 0,
     coverImagePath: '',
     resolvedCoverImagePath: covers.motion,
     createdAt: now - 11 * day,

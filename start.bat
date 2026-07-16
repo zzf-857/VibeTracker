@@ -1,95 +1,104 @@
 @echo off
-title VibeTracker 快速启动控制面板
+title VibeTracker Quick Start Panel
 color 0b
 
 :menu
 cls
 echo ===================================================
-echo            VibeTracker 阶段性快速启动控制面板
+echo              VibeTracker Quick Start Panel
 echo ===================================================
-echo  [1] 启动开发调试模式 (开启自动热更新 - 推荐)
-echo  [2] 编译打包并启动生产预览 (接近真实客户端表现)
-echo  [3] 一键备份 SQLite 数据库 (确保数据万无一失)
-echo  [4] 运行代码规范检测 (ESLint 语法纠错)
-echo  [5] 运行核心单元测试 (12/12 测试集)
-echo  [6] 退出面板
+echo  [1] Start development mode
+echo  [2] Build and preview desktop app
+echo  [3] Backup VibeTracker SQLite database
+echo  [4] Run ESLint
+echo  [5] Run unit tests
+echo  [6] Build Windows installer
+echo  [7] Exit
 echo ===================================================
 echo.
-set /p opt="请选择操作序号 (1-6) 并按回车: "
+set /p opt="Choose an option (1-7), then press Enter: "
 
 if "%opt%"=="1" goto op_dev
 if "%opt%"=="2" goto op_build
 if "%opt%"=="3" goto op_backup
 if "%opt%"=="4" goto op_lint
 if "%opt%"=="5" goto op_test
-if "%opt%"=="6" goto op_exit
+if "%opt%"=="6" goto op_package
+if "%opt%"=="7" goto op_exit
 
 echo.
-echo [错误] 输入的序号无效，请输入 1 到 6 之间的数字。
+echo [Error] Invalid option. Please choose 1 to 7.
 pause
 goto menu
 
 :op_dev
 echo.
-echo 正在启动开发调试环境，请稍候...
+echo Starting VibeTracker development mode...
 npm run dev
 pause
 goto menu
 
 :op_build
 echo.
-echo 正在进行完整打包编译 (tsc frontend + tsc electron)...
+echo Building VibeTracker (frontend + Electron main process)...
 call npm run build
-if %errorlevel% neq 0 (
-    echo.
-    echo [错误] 编译失败，请检查报错！
-    pause
-    goto menu
-)
+if %errorlevel% neq 0 goto op_build_failed
 echo.
-echo 正在启动生产预览环境...
-npm run electron:start
+echo Starting VibeTracker desktop preview...
+npm run electron:run
+pause
+goto menu
+
+:op_build_failed
+echo.
+echo [Error] Build failed. Please check the output above.
 pause
 goto menu
 
 :op_backup
 echo.
-echo 正在读取系统路径并备份 SQLite 数据库...
+echo Backing up VibeTracker SQLite database...
 set "BACKUP_DIR=database_backups"
 if not exist "%BACKUP_DIR%" mkdir "%BACKUP_DIR%"
 
-:: 获取格式化后的时间戳
 set "timestamp=%date:~0,4%%date:~5,2%%date:~8,2%_%time:~0,2%%time:~3,2%%time:~6,2%"
-:: 剔除时间戳中可能存在的空格(比如上午时段个位数小时产生的空格)
 set "timestamp=%timestamp: =0%"
 
-if exist "%APPDATA%\ai-tools-manager\devtracker.db" (
-    copy "%APPDATA%\ai-tools-manager\devtracker.db" "%BACKUP_DIR%\devtracker_backup_%timestamp%.db" >nul
-    echo [成功] 数据库文件已成功备份至根目录 "%BACKUP_DIR%" 下！
-    echo 备份文件名: devtracker_backup_%timestamp%.db
-) else (
-    echo [提示] 尚未在该系统上发现真实生成的数据库文件。
-    echo (数据库只有在您初次运行并创建项目后，才会自动在系统路径中创建)
-)
+if exist "%APPDATA%\VibeTracker\vibetracker.db" goto op_backup_copy
+echo [Info] No VibeTracker database found at "%APPDATA%\VibeTracker\vibetracker.db".
+pause
+goto menu
+
+:op_backup_copy
+copy "%APPDATA%\VibeTracker\vibetracker.db" "%BACKUP_DIR%\vibetracker_backup_%timestamp%.db" >nul
+echo [OK] Database backup saved to "%BACKUP_DIR%".
+echo Backup file: vibetracker_backup_%timestamp%.db
 pause
 goto menu
 
 :op_lint
 echo.
-echo 正在进行 ESLint 规范性检测...
+echo Running ESLint...
 call npm run lint
 if %errorlevel% neq 0 (
-    echo 检测到语法或规范警告。
+    echo ESLint reported issues.
 ) else (
-    echo [完美] 代码检测 100%% 通过！
+    echo [OK] ESLint passed.
 )
 pause
 goto menu
 
 :op_test
 echo.
-echo 正在运行单元测试...
+echo Running unit tests...
 call npm run test:unit
+pause
+goto menu
+
+:op_package
+echo.
+echo Building VibeTracker Windows installer...
+call npm run package -- --publish never
 pause
 goto menu
 

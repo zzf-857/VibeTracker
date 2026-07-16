@@ -45,6 +45,8 @@ function ImagePreviewModal({ src, onClose }: { src: string; onClose: () => void 
   const positionRef = useRef({ x: 0, y: 0 })
   const containerRef = useRef<HTMLDivElement | null>(null)
   const imageContainerRef = useRef<HTMLDivElement | null>(null)
+  const dialogRef = useRef<HTMLDivElement | null>(null)
+  const closeButtonRef = useRef<HTMLButtonElement | null>(null)
 
   // 同步平移坐标给 Ref 避免在拖动时闭包引用陈旧的 state
   useEffect(() => {
@@ -78,15 +80,37 @@ function ImagePreviewModal({ src, onClose }: { src: string; onClose: () => void 
     }
   }, [])
 
-  // 监听 Escape 键盘按键退出
+  // 键盘关闭、焦点环绕与关闭后的焦点恢复。
   useEffect(() => {
+    const previouslyFocused = document.activeElement instanceof HTMLElement ? document.activeElement : null
+    const previousOverflow = document.body.style.overflow
     const handleKeyDown = (e: KeyboardEvent) => {
       if (e.key === 'Escape') {
         onClose()
+      } else if (e.key === 'Tab') {
+        const focusable = dialogRef.current?.querySelectorAll<HTMLElement>(
+          'button:not([disabled]), [href], input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])',
+        )
+        if (!focusable?.length) return
+        const first = focusable[0]
+        const last = focusable[focusable.length - 1]
+        if (e.shiftKey && document.activeElement === first) {
+          e.preventDefault()
+          last.focus()
+        } else if (!e.shiftKey && document.activeElement === last) {
+          e.preventDefault()
+          first.focus()
+        }
       }
     }
+    document.body.style.overflow = 'hidden'
     window.addEventListener('keydown', handleKeyDown)
-    return () => window.removeEventListener('keydown', handleKeyDown)
+    closeButtonRef.current?.focus()
+    return () => {
+      window.removeEventListener('keydown', handleKeyDown)
+      document.body.style.overflow = previousOverflow
+      previouslyFocused?.focus()
+    }
   }, [onClose])
 
   // 双击一键复位
@@ -154,12 +178,19 @@ function ImagePreviewModal({ src, onClose }: { src: string; onClose: () => void 
 
   return createPortal(
     <div
+      ref={dialogRef}
+      role="dialog"
+      aria-modal="true"
+      aria-label="图片预览"
       onClick={handleBackgroundClick}
       className="fixed inset-0 z-[999] bg-black/75 backdrop-blur-xl flex items-center justify-center animate-fade-in select-none"
       style={{ cursor: 'zoom-out' }}
     >
       {/* 右上角关闭按钮 */}
       <button
+        ref={closeButtonRef}
+        type="button"
+        aria-label="关闭图片预览"
         onClick={onClose}
         className="absolute top-6 right-6 w-11 h-11 rounded-full bg-white/10 hover:bg-white/20 border border-white/10 text-white flex items-center justify-center transition-all motion-press hover:scale-105 active:scale-95 z-50 shadow-lg"
         title="关闭预览 (Esc)"
@@ -204,6 +235,8 @@ function ImagePreviewModal({ src, onClose }: { src: string; onClose: () => void 
         style={{ cursor: 'default' }}
       >
         <button
+          type="button"
+          aria-label="缩小图片"
           onClick={handleZoomOut}
           className="w-8 h-8 rounded-full bg-white/5 hover:bg-white/15 active:bg-white/25 flex items-center justify-center transition-colors motion-press"
           title="缩小"
@@ -217,6 +250,8 @@ function ImagePreviewModal({ src, onClose }: { src: string; onClose: () => void 
         </span>
 
         <button
+          type="button"
+          aria-label="放大图片"
           onClick={handleZoomIn}
           className="w-8 h-8 rounded-full bg-white/5 hover:bg-white/15 active:bg-white/25 flex items-center justify-center transition-colors motion-press"
           title="放大"
@@ -228,6 +263,8 @@ function ImagePreviewModal({ src, onClose }: { src: string; onClose: () => void 
         <div className="w-[1px] h-4 bg-white/15" />
 
         <button
+          type="button"
+          aria-label="重置图片缩放与位置"
           onClick={handleReset}
           className="w-8 h-8 rounded-full bg-white/5 hover:bg-white/15 active:bg-white/25 flex items-center justify-center transition-colors motion-press"
           title="重置缩放 & 平移 (双击图片)"

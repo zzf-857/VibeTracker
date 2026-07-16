@@ -14,6 +14,20 @@ export function AnimatedPage({ children, className, tone = 'standard', ...props 
   const containerRef = useRef<HTMLDivElement>(null)
 
   useGSAP(() => {
+    const media = gsap.matchMedia()
+    let reduceMotion = false
+    media.add({ reduceMotion: '(prefers-reduced-motion: reduce)' }, context => {
+      reduceMotion = Boolean(context.conditions?.reduceMotion)
+    })
+    if (reduceMotion) {
+      const items = gsap.utils.toArray('.stagger-item, .stagger-item-fast, .stagger-item-horizontal-left')
+      gsap.set(items, { clearProps: 'all', autoAlpha: 1 })
+      items.forEach(item => {
+        const element = item as HTMLElement
+        element.classList.remove('stagger-item', 'stagger-item-fast', 'stagger-item-horizontal-left')
+      })
+      return () => media.revert()
+    }
     // 1. Standard Stagger Items (Cards, commit cards, etc.)
     const staggerItems = gsap.utils.toArray('.stagger-item')
     if (staggerItems.length > 0) {
@@ -84,6 +98,7 @@ export function AnimatedPage({ children, className, tone = 'standard', ...props 
         }
       )
     }
+    return () => media.revert()
   }, { scope: containerRef })
 
   return (

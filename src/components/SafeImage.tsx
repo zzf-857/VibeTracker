@@ -1,31 +1,20 @@
 import { useEffect, useState } from 'react'
 import { ImageOff } from 'lucide-react'
-import { toImageSrc } from '../lib/projectView'
+import { toImageSrc, type ImageThumbnailSize } from '../lib/projectView'
 import { useImagePreview } from './ImagePreview'
-
-const imageCache = new Map<string, string>()
-const MAX_CACHE_SIZE = 100
-
-function writeCache(key: string, value: string) {
-  if (imageCache.size >= MAX_CACHE_SIZE) {
-    const firstKey = imageCache.keys().next().value
-    if (firstKey !== undefined) {
-      imageCache.delete(firstKey)
-    }
-  }
-  imageCache.set(key, value)
-}
 
 export function SafeImage({ 
   src, 
   alt, 
   className,
-  previewable = false
+  previewable = false,
+  thumbnailSize,
 }: { 
   src: string; 
   alt: string; 
   className?: string;
   previewable?: boolean
+  thumbnailSize?: ImageThumbnailSize
 }) {
   const [failed, setFailed] = useState(false)
   const [resolvedSrc, setResolvedSrc] = useState('')
@@ -46,33 +35,15 @@ export function SafeImage({
         return
       }
 
-      // Check Cache First
-      if (imageCache.has(src)) {
-        setResolvedSrc(imageCache.get(src)!)
-        return
-      }
-
-      try {
-        const dataUrl = await window.ipcRenderer.invoke('read-image-data-url', src)
-        if (!cancelled) {
-          const finalSrc = dataUrl || toImageSrc(src)
-          setResolvedSrc(finalSrc)
-          if (dataUrl) {
-            writeCache(src, dataUrl)
-          }
-        }
-      } catch {
-        if (!cancelled) {
-          setResolvedSrc(toImageSrc(src))
-        }
-      }
+      // Local images stream through a controlled protocol instead of permanent Base64 copies.
+      if (!cancelled) setResolvedSrc(toImageSrc(src, thumbnailSize))
     }
 
     resolveImage()
     return () => {
       cancelled = true
     }
-  }, [src])
+  }, [src, thumbnailSize])
 
   if (failed || !src || !resolvedSrc) {
     return (
@@ -88,18 +59,30 @@ export function SafeImage({
   const handleClick = (e: React.MouseEvent<HTMLImageElement>) => {
     if (previewable) {
       e.stopPropagation()
-      showPreview(resolvedSrc)
+      showPreview(toImageSrc(src))
     }
+  }
+
+  const handleKeyDown = (event: React.KeyboardEvent<HTMLImageElement>) => {
+    if (!previewable || !['Enter', ' '].includes(event.key)) return
+    event.preventDefault()
+    event.stopPropagation()
+    showPreview(toImageSrc(src))
   }
 
   return (
     <img 
       src={resolvedSrc} 
       alt={alt} 
+      role={previewable ? 'button' : undefined}
+      tabIndex={previewable ? 0 : undefined}
+      aria-label={previewable ? `预览图片：${alt}` : undefined}
+      decoding="async"
+      loading={thumbnailSize ? 'lazy' : 'eager'}
       className={`${className || ''} ${previewable ? 'cursor-zoom-in transition-all duration-200 hover:brightness-105' : ''}`} 
       onClick={handleClick}
+      onKeyDown={handleKeyDown}
       onError={() => setFailed(true)} 
     />
   )
 }
-

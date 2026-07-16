@@ -5,6 +5,10 @@ node_modules/
 dist/
 dist-electron/
 release/
+release-smoke-previous/
+
+# Local application-managed data
+AppResource/
 
 # TypeScript incremental build info
 *.tsbuildinfo
@@ -23,6 +27,7 @@ Thumbs.db
 .idea/
 .worktrees/
 .playwright-cli/
+output/playwright/
 
 # Local brainstorming companion output
 .superpowers/
